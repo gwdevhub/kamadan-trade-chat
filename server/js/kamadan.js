@@ -3,7 +3,7 @@ var KamadanClient = {
   search:function() {
     var term = (this.search_input.value+'').trim();
     if(!term.length)
-      return this.redrawMessages();
+      return;
     var self = this;
     var req = new XMLHttpRequest();
     req.addEventListener("load", function() {
@@ -30,21 +30,29 @@ var KamadanClient = {
       e.preventDefault();
       self.search();
     });
-    document.getElementById('search-input').addEventListener('keyup',function(e) {
+    var onchange = function(e) {
       if(self.search_timer)
         clearTimeout(self.search_timer);
+      if(!(self.search_input.value+'').trim().length)
+        return self.redrawMessages(true);
       self.search_timer = setTimeout(function() {
         self.search();
       },250);
-    });
-    
+    };
+    this.search_input.addEventListener('keyup',onchange);
+    this.search_input.addEventListener('change',onchange);
     setInterval(function() {
       self.timestamps();
     },1000);
     setInterval(function() {
       self.poll();
     },30000);
-    this.ws = this.ws || new WebSocket("ws://localhost:9090");
+    this.tryConnectWebsocket();
+  },
+  tryConnectWebsocket:function() {
+    if(this.ws && this.ws.readyState < 3)
+      return;
+    this.ws = new WebSocket("ws://"+window.location.hostname+":9090");
     this.ws.onmessage = function(evt) {
       try {
         var data = JSON.parse(evt.data);
@@ -53,21 +61,30 @@ var KamadanClient = {
       }
       catch(e) {}
     };
+    var self = this;
+    this.ws.onclose = function(evt) {
+      setTimeout(function() {
+        self.tryConnectWebsocket();
+      },3000);
+    };
   },
   last_drawn_hash:'',
-  redrawMessages:function(is_search = false) {
+  redrawMessages:function(flush = false) {
     var html = document.getElementById('current-wrapper').innerHTML;
+    if(flush) {
+      html = '';
+      document.getElementById('search-info').innerHTML = '';
+    }
     var to_add = [];
     var messages = this.messages;
-    var clear = false;
-    if(this.search_input.value.length) {
-      if(!is_search) return;
+    if((this.search_input.value+'').trim().length) {
+      if(!flush) return;
       messages = this.search_results;
       clear = true;
       html = '';
     }
     for(var i = 0;i < messages.length ;i++) {
-      if(!clear && document.getElementById('t-'+messages[i].h))
+      if(!flush && document.getElementById('t-'+messages[i].h))
         break;
       to_add.push(i);
     }
@@ -121,7 +138,9 @@ var KamadanClient = {
       json[i].t = new Date(json[i].t * 1000);
       has_new = this.search_results.unshift(json[i]);
     }
+    
     this.redrawMessages(true);
+    document.getElementById('search-info').innerHTML = this.search_results.length+" results found for <i>"+(this.search_input.value+'').trim()+"</i>";
   },
   poll:function() {
     var self = this;

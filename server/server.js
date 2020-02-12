@@ -68,11 +68,24 @@ function init(cb) {
 		
     var cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
     
+    function getIP(req) {
+      return (req.header('x-forwarded-for') || req.connection.remoteAddress).split(':').pop();
+    }
+    function isLocal(req) {
+      return  getIP(req) == '127.0.0.1';
+    }
+    
+    app.get('/kill',function(req,res) {
+      res.end();
+      if(!isLocal(req)) 
+        return console.error("POST called from "+getIP(req)+" - naughty!");
+      process.exit();
+    });
+    
     app.post(['/','/add'],function(req,res) {
       res.end();
-      var ip = req.header('x-forwarded-for') || req.connection.remoteAddress;
-      if(ip != '::ffff:127.0.0.1')
-        return console.error("POST called from "+ip+" - naughty!");
+      if(!isLocal(req)) 
+        return console.error("POST called from "+getIP(req)+" - naughty!");
       try { 
         var added_message = JSON.stringify(KamadanTrade.addMessage(req));
         if(added_message.length) {
