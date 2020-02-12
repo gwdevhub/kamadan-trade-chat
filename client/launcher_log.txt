@@ -1,0 +1,6 @@
+Launcher version: 1.2
+Skipping runtime checks
+Creating directories and reading .ini... 
+dll path: C:\Users\Jon\Documents\Git Repositories\kamadan-trade-chat\client\kamadan-trade-chat.dll
+User did not want to help me find a dll :(
+Flushing log, bye!
