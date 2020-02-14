@@ -43,7 +43,7 @@ var KamadanTrade = {
     console.log(term);
     return this.init().then(function() {
       return new Promise(function(resolve,reject) {
-        self.db.all("SELECT h,t,s,m FROM trade_messages WHERE m LIKE ? ORDER BY rowid DESC LIMIT "+live_message_log_max,['%'+term+'%'],(err, rows ) => {
+        self.db.all("SELECT h,t,s,m FROM trade_messages WHERE m LIKE ? GROUP BY m,s ORDER BY rowid DESC LIMIT "+live_message_log_max,['%'+term+'%'],(err, rows ) => {
           if(err) {
             console.error(err);
             return reject(err);
