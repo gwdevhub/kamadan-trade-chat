@@ -52,6 +52,10 @@ function init(cb) {
 		}
 		app.set('etag', 'strong');
 		app.set('x-powered-by', false);
+    app.use(function (req, res, next) {  
+      res.removeHeader("date");
+      next();
+    });
 		//-----------------------------------
 		// ACTUAL ROUTING BEGINS
 		//-----------------------------------
@@ -101,10 +105,19 @@ function init(cb) {
     app.get('/', function(req,res) {
       res.sendFile(__dirname+'/index.html');
     });
-    app.get('/s', function(req,res) {
+    app.get('/s/:term', function(req,res) {
       var term = ((req.params.term || req.query.term || '')+'').toLowerCase();
       KamadanTrade.search(term).then(function(rows) {
-        console.log(rows);
+        res.json(rows);
+      }).catch(function(e) {
+        console.error(e);
+        res.json([]);
+      });
+    });
+    app.get('/u/:user', function(req,res) {
+      var user = ((req.params.user || req.query.user || '')+'').toLowerCase();
+      console.log("By user: "+user);
+      KamadanTrade.getMessagesByUser(user).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {
         console.error(e);
@@ -118,7 +131,7 @@ function init(cb) {
         if(etag == KamadanTrade.last_message.h)
           return res.status(304).end();
         //console.log(KamadanTrade.last_message);
-        res.setHeader('etag', KamadanTrade.last_message.h);
+        res.setHeader('ETag', KamadanTrade.last_message.h);
       }
       // Return messages since last hash
       if(etag != 'none') {

@@ -56,13 +56,13 @@ RESPONSE BODY:
 ]
 ```
 ---
-__Endpoint__: http://localhost/s?term=<search_term><br/>
+__Endpoint__: http://localhost/s/<search_term><br/>
 __Description:__ Used to search for trade messages. Returns HTTP 200 with JSON encoded array of trade messages.
 __Example:__
 ```
 REQUEST HEADERS:
 
-GET /s?term=eternal%20blade HTTP/1.1
+GET /s/eternal%20blade HTTP/1.1
 Host: localhost
 
 RESPONSE HEADERS:
@@ -76,5 +76,28 @@ RESPONSE BODY:
   {"h":"XkGxUHXUMF","t":1581704832,"s":"Nemesis Asheth","m":"WTB Delicious Cake x82, 1e/each"},
   {"h":"umRQDxcVhP","t":1581540741,"s":"Ron The Spirit","m":"WTS ~~ Cupcakes 20e ea ~~"},
   {"h":"v5TjyGLnSN","t":1581540663,"s":"A Noise In The Dark","m":"wts 54 cupcakes"}
+]
+```
+---
+__Endpoint__: http://localhost/u/<player_name><br/>
+__Description:__ Used to fetch trade messages by player. Returns HTTP 200 with JSON encoded array of trade messages.
+__Example:__
+```
+REQUEST HEADERS:
+
+GET /u/agonizing%20blades HTTP/1.1
+Host: localhost
+
+RESPONSE HEADERS:
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+ETag: "rZJ64ws4R0vSnPPuM6MGcQ=="
+
+RESPONSE BODY:
+[
+  {"h":"1581708548PfE","t":1581708548,"s":"Agonizing Blades","m":"WTS EL Tonics Vekk,Livia,Melonni,Goren,Morgahn,Margrid,Norgu,Pyre,Tahlkora,Ogden,Hayda,Dunkoro  AND UNDED MINIS PM ME"},
+  {"h":"1581708181kOU","t":1581708181,"s":"Agonizing Blades","m":"WTS EL Tonics Vekk,Livia,Melonni,Goren,Morgahn,Margrid,Norgu,Pyre,Tahlkora,Ogden,Hayda,Dunkoro PM ME"},
+  {"h":"1581708149Hlt","t":1581708149,"s":"Agonizing Blades","m":"WTS Tonics Vekk,Livia,Melonni,Goren,Morgahn,Margrid,Norgu,Pyre,Tahlkora,Ogden,Hayda,Dunkoro PM ME"}
 ]
 ```

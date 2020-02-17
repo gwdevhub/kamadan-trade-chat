@@ -1,5 +1,7 @@
 var KamadanClient = {
+  poll_interval:3000,
   search_results:[],
+  messages:[],
   search:function() {
     var term = (this.search_input.value+'').trim();
     if(!term.length)
@@ -16,14 +18,13 @@ var KamadanClient = {
       }
       self.parseSearchResults(result);
     });
-    req.open("GET", "/s?term="+encodeURIComponent(term));
+    req.open("GET", "/s/"+encodeURIComponent(term));
     req.send();
   },
   getLastMessage:function() {
     return this.messages ? this.messages[0] : null;
   },
   init:function() {
-    this.poll();
     this.search_input = document.getElementById('search-input');
     var self = this;
     document.getElementById('search-form').addEventListener('submit', function(e) {
@@ -44,28 +45,36 @@ var KamadanClient = {
     setInterval(function() {
       self.timestamps();
     },1000);
-    setInterval(function() {
-      self.poll();
-    },30000);
-    this.tryConnectWebsocket();
+    this.pollWebsocket();
+    this.poll();
   },
-  tryConnectWebsocket:function() {
-    if(this.ws && this.ws.readyState < 3)
+  pollWebsocket:function() {
+    if(!window.WebSocket)
       return;
+    var self=this;
+    setTimeout(function() {
+      self.pollWebsocket();
+    },10000);
+    if (this.ws) {
+      switch(this.ws.readyState) {
+        case WebSocket.OPEN:
+          this.ws.send('');
+        case WebSocket.CONNECTING:
+        case WebSocket.CLOSING:
+          return;
+      }
+    }
+    self.poll_interval = 3000;
     this.ws = new WebSocket("ws://"+window.location.hostname+":9090");
+    var self=this;
     this.ws.onmessage = function(evt) {
+      self.poll_interval = 30000;
       try {
         var data = JSON.parse(evt.data);
         if(data && data.h)
           self.parseMessages([data]);
       }
       catch(e) {}
-    };
-    var self = this;
-    this.ws.onclose = function(evt) {
-      setTimeout(function() {
-        self.tryConnectWebsocket();
-      },3000);
     };
   },
   last_drawn_hash:'',
@@ -158,6 +167,9 @@ var KamadanClient = {
     req.open("GET", "/m");
     req.setRequestHeader('if-none-match',(this.getLastMessage() || {'h':'none'}).h);
     req.send();
+    this.poller = setTimeout(function() {
+      self.poll();
+    },this.poll_interval);
   }
 };
 

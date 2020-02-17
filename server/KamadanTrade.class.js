@@ -73,7 +73,7 @@ var KamadanTrade = {
     }
     // Parse message content
     message.m = message.m.replace(/\/\//,'/');
-    message.h = String.random(10);
+    message.h = message.t+String.random(3);
     // live message log
     this.live_message_log.unshift(message);
     while(this.live_message_log.length > live_message_log_max) {
@@ -93,6 +93,24 @@ var KamadanTrade = {
       console.error(err);
     });
     return message;
+  },
+  getMessagesByUser:function(user) {
+    var self = this;
+    user = (user+'').trim();
+    if(!user.length)
+      return Promise.resolve([]);
+    return this.init().then(function() {
+      return new Promise(function(resolve,reject) {
+        self.db.all("SELECT h,t,s,m FROM trade_messages WHERE s LIKE ? GROUP BY m ORDER BY rowid DESC LIMIT "+live_message_log_max,[user],(err, rows ) => {
+          if(err) {
+            console.error(err);
+            return reject(err);
+          }
+          console.log(rows);
+          return resolve(rows);
+        });
+      });
+    });
   },
   getMessagesSince:function(h) {
     var slice_end = 0;
