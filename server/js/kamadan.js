@@ -1,5 +1,6 @@
 var KamadanClient = {
   poll_interval:3000,
+  ws_interval:20000,
   search_results:[],
   messages:[],
   search:function() {
@@ -20,6 +21,14 @@ var KamadanClient = {
     });
     req.open("GET", "/s/"+encodeURIComponent(term));
     req.send();
+  },
+  setPollInterval:function(ms) {
+    this.poll_interval = Math.max(120000,ms);
+    console.log("Poll interval set to "+ms+"ms");
+  },
+  setWebsocketInterval:function(ms) {
+    this.ws_interval = Math.max(120000,ms);
+    console.log("Websocket interval set to "+ms+"ms");
   },
   getLastMessage:function() {
     return this.messages ? this.messages[0] : null;
@@ -45,6 +54,8 @@ var KamadanClient = {
     setInterval(function() {
       self.timestamps();
     },1000);
+    this.setPollInterval(3000);
+    this.setWebsocketInterval(20000);
     this.pollWebsocket();
     this.poll();
   },
@@ -54,7 +65,7 @@ var KamadanClient = {
     var self=this;
     setTimeout(function() {
       self.pollWebsocket();
-    },10000);
+    },this.ws_interval);
     if (this.ws) {
       switch(this.ws.readyState) {
         case WebSocket.OPEN:
@@ -64,11 +75,18 @@ var KamadanClient = {
           return;
       }
     }
-    self.poll_interval = 3000;
-    this.ws = new WebSocket("ws://"+window.location.hostname+":9090");
     var self=this;
+    this.ws = new WebSocket("ws://"+window.location.hostname+":9090");
+    this.ws.onopen = function(evt) {
+      console.log("Websocket opened");
+      self.setPollInterval(30000);
+    }
+    this.ws.onerror = function(evt) {
+      console.error("Websocket error",evt);
+      self.setPollInterval(3000);
+    }
     this.ws.onmessage = function(evt) {
-      self.poll_interval = 30000;
+      self.setPollInterval(30000);
       try {
         var data = JSON.parse(evt.data);
         if(data && data.h)
@@ -153,23 +171,36 @@ var KamadanClient = {
   },
   poll:function() {
     var self = this;
+    console.log("polling");
+    function requeue() {
+      self.poller = setTimeout(function() {
+        self.poll();
+      },self.poll_interval);
+      console.log("Poll queued");
+    }
     var req = new XMLHttpRequest();
     req.addEventListener("load", function() {
-      if(!this.response.length) return;
+      if(!this.response.length)
+        return requeue();
+      var result;
       try {
         result = JSON.parse(this.response);
       } catch(e) {
         console.error(e);
-        return;
+        return requeue();
       }
+      if (!self.ws || self.ws.readyState != WebSocket.OPEN)
+        self.setPollInterval(3000);
       self.parseMessages(result);
+      requeue();
+    });
+    req.addEventListener("error",function() {
+      self.setPollInterval(self.poll_interval + 3000);
+      requeue();
     });
     req.open("GET", "/m");
-    req.setRequestHeader('if-none-match',(this.getLastMessage() || {'h':'none'}).h);
+    req.setRequestHeader('If-None-Match',(this.getLastMessage() || {'h':'none'}).h);
     req.send();
-    this.poller = setTimeout(function() {
-      self.poll();
-    },this.poll_interval);
   }
 };
 

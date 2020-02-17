@@ -3,6 +3,9 @@ process.env.NODE_PATH = "/home/node_modules";
 require("module").Module._initPaths();
 var fs = fs || require('fs');
 
+// Valid source IP Addresses that can submit new trade messages
+var whitelisted_sources = ['127.0.0.1'];
+
 function loadModules(cb) {
 	cb = cb || function(){};
 	console.log("\n---------- Loading Modules via require() ----------\n");
@@ -78,18 +81,22 @@ function init(cb) {
     function isLocal(req) {
       return  getIP(req) == '127.0.0.1';
     }
+    // Has this request object come from a trusted source?
+    function isValidTradeSource(req) {
+      return  whitelisted_sources.indexOf(getIP(req)) != -1;
+    }
     
     app.get('/kill',function(req,res) {
       res.end();
       if(!isLocal(req)) 
-        return console.error("POST called from "+getIP(req)+" - naughty!");
+        return console.error("/kill called from "+getIP(req)+" - naughty!");
       process.exit();
     });
     
     app.post(['/','/add'],function(req,res) {
       res.end();
-      if(!isLocal(req)) 
-        return console.error("POST called from "+getIP(req)+" - naughty!");
+      if(!isValidTradeSource(req)) 
+        return console.error("/add called from "+getIP(req)+" - naughty!");
       try { 
         var added_message = JSON.stringify(KamadanTrade.addMessage(req));
         if(added_message.length) {
@@ -127,12 +134,13 @@ function init(cb) {
     app.get('/m',function(req,res) {
       var etag = req.header('if-none-match') || 'none';
       // 304 if no new messages
-      if(KamadanTrade.last_message) {
-        if(etag == KamadanTrade.last_message.h)
-          return res.status(304).end();
-        //console.log(KamadanTrade.last_message);
-        res.setHeader('ETag', KamadanTrade.last_message.h);
-      }
+      if(!KamadanTrade.last_message)
+        return res.status(304).end();
+      if(etag == KamadanTrade.last_message.h)
+        return res.status(304).end();
+      //console.log(KamadanTrade.last_message);
+      res.setHeader('ETag', KamadanTrade.last_message.h);
+      
       // Return messages since last hash
       if(etag != 'none') {
         return res.json(KamadanTrade.getMessagesSince(etag));

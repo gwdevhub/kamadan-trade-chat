@@ -6,7 +6,8 @@ ENV["VAGRANT_USE_VAGRANT_TRIGGERS"] = "1"			#
 Vagrant.require_version ">= 2.1.0"	# 2.1.0 required for vagrant triggers.
 $config_folder = "#{File.dirname(__FILE__)}/VagrantConfig"		# Folder where all required files are, escaping any spaces. Make sure this exists!!
 $rsync_folder_excludes = {		# Any folders that you don't want to rsync to the server.
-	"." => "/vagrant"
+	"." => "/vagrant",
+  "server/node_modules" => "/home/vagrant/kamadan-trade-chat/server/node_modules"
 }
 
 # ------------------	Vagrant Pre-Includes	------------------ #
@@ -23,6 +24,11 @@ end
 
 enforce_machine_name_requirement()
 
+Ubuntu18_Official_amd64 = {
+  'box_url' => 'https://cloud-images.ubuntu.com/bionic/20200206/bionic-server-cloudimg-amd64-vagrant.box',
+  'box_name' => 'ubuntu-18.04_amd64_official'
+}
+
 Ubuntu_Official_i386 = {
 	'box_url' => 'https://cloud-images.ubuntu.com/vagrant/trusty/current/trusty-server-cloudimg-i386-vagrant-disk1.box',
 	'box_name' => 'ubuntu-14.04_i386_official'
@@ -38,7 +44,7 @@ Debian8_Official_amd64 = {
 # Choose 1 of the above boxes for our local environment. 
 # Try swapping out for i386 version if your PC is a million years old and doesn't support VT-x.
 
-VirtualBox = Ubuntu_Official_amd64
+VirtualBox = Ubuntu18_Official_amd64
 
 # ------------------ 	Chef JSON Definitions		 ------------------
 # Anything in the "environment_variables" array will be defined in /server/environment_variables.inc.php by Chef
