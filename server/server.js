@@ -203,11 +203,11 @@ function init(cb) {
           console.log(message);
           return;
         }
-        if(obj.since) {
-          var rows = KamadanTrade.getMessagesSince(obj.since);
+        if(typeof obj.since != 'undefined') {
+          var rows = KamadanTrade.getMessagesSince(obj.since || 'none');
           return ws.send(JSON.stringify({since:obj.since, num_results:rows.length,results:rows}));
         }
-        if(obj.query) {
+        if(typeof obj.query != 'undefined') {
           return KamadanTrade.search(obj.query).then(function(rows) {
             ws.send(JSON.stringify({query:obj.query, num_results:rows.length,results:rows}));
           }).catch(function(e) {
