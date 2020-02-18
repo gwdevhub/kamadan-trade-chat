@@ -11,12 +11,19 @@ var KamadanClient = {
     console.error.apply(console,arguments);
   },
   max_messages:100,
+  last_search_term:'',
+  last_search_date:null,
   search_results:[],
   messages:[],
   search:function(term) {
     if(term)
       this.search_input.value = term;
     var term = (this.search_input.value+'').trim();
+    // - 3000ms wait time between same searches
+    if(term == this.last_search_term && this.last_search_date + 3000 > Date.now())
+      return;
+    this.last_search_term = term;
+    this.last_search_date = Date.now();
     var endpoint = '/s/';
     if(term.indexOf('user:') == 0) {
       term = term.substring(5);
@@ -81,7 +88,7 @@ var KamadanClient = {
         self.search();
       },250);
     };
-    this.search_input.addEventListener('keyup',onchange);
+    //this.search_input.addEventListener('keyup',onchange);
     this.search_input.addEventListener('change',onchange);
     setInterval(function() {
       self.timestamps();
