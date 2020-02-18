@@ -9,7 +9,17 @@ function sleep(ms) {
 } 
 
 var KamadanTrade = {
+  flood_timeout:10, // Seconds to avoid user spamming trade chat i.e. 10s between the same message
   live_message_log:[],
+  last_message_by_user:{},
+  housekeeping:function() {
+    // Clear down last_message_by_user if over 1 minute old.
+    var one_minute_ago_in_seconds = (Date.now() / 1000) - 60;
+    for(var i in this.last_message_by_user) {
+      if(this.last_message_by_user[i].t < one_minute_ago_in_seconds)
+        delete this.last_message_by_user[i];
+    }
+  },
   init:function() {
     while(this.initting) {
       sleep(100);
@@ -18,6 +28,9 @@ var KamadanTrade = {
       return Promise.resolve();
     this.initted = this.initting = true;
     var self = this;
+    setInterval(function() {
+      self.housekeeping();
+    },30000);
     return new Promise(function(resolve,reject) {
       var db = new sqlite3.Database(__dirname+'/database.db', (err) => {
         self.initting = false;
@@ -61,7 +74,7 @@ var KamadanTrade = {
     } catch(e) {
       console.error("Failed to parse message from request");
       console.error(e);
-      return;
+      return false;
     }
     // Parse timestamp
     try {
@@ -69,11 +82,21 @@ var KamadanTrade = {
     } catch(e) {
       console.error("Failed to parse timestamp "+message.t);
       console.error(e);
-      return;
+      return false;
     }
     // Parse message content
-    message.m = message.m.replace(/\/\//,'/');
+    message.m = message.m.replace(/\\(\\|\[|\])/g,'$1');
+    if(!message.m.length)
+      return false; // Empty message
     message.h = message.t+String.random(3);
+    // Avoid spam by the same user (or multiple trade message sources!)
+    var last_user_msg = this.last_message_by_user[message.s];
+    if(last_user_msg && last_user_msg.m == message.m
+    && Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
+      console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"s diff");
+      return last_user_msg;
+    }
+    this.last_message_by_user[message.s] = message;
     // live message log
     this.live_message_log.unshift(message);
     while(this.live_message_log.length > live_message_log_max) {
@@ -91,6 +114,7 @@ var KamadanTrade = {
       });
     }).catch(function(err) {
       console.error(err);
+      return message;
     });
     return message;
   },

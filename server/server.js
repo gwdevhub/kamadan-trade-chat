@@ -9,6 +9,8 @@ var whitelisted_sources = [
 '142.44.211.74', // Greg
 '176.248.118.201'// Me
 ];
+var lock_file = __dirname+'/add.lock';
+fs.unlink(lock_file,function(){});
 
 var last_gc = 0;
 function garbage_collect() {
@@ -116,17 +118,25 @@ function init(cb) {
       res.end();
       if(!isValidTradeSource(req)) 
         return console.error("/add called from "+getIP(req)+" - naughty!");
-      try { 
-        var added_message = JSON.stringify(KamadanTrade.addMessage(req));
-        if(added_message.length) {
-          wss.clients.forEach(function each(client) {
-            client.send(added_message);
-          });
+      lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
+        if(err) console.error(err);
+        // Don't drop out on error; we'll unlock the stale file later
+        try {
+          var added_message = KamadanTrade.addMessage(req);
+          if(!added_message)
+            return lockFile.unlock(lock_file); // Error adding message
+          added_message = JSON.stringify(added_message);
+          if(added_message.length) {
+            wss.clients.forEach(function each(client) {
+              client.send(added_message);
+            });
+          }
+        } catch(e) { 
+          console.error(e);
         }
-      } catch(e) { 
-        console.error(e);
-      }
-      cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+        cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+        return lockFile.unlock(lock_file);
+      });
     });
     app.get('/', function(req,res) {
       res.sendFile(__dirname+'/index.html');

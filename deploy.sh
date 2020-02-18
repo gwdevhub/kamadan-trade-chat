@@ -42,11 +42,11 @@ rm -R ./node_modules;
 tar -zxf "${PROJECT_CODE_FOLDER}/server/node_modules.tar.gz"
 mkdir -p ./node_modules;
 cmp -s "${PROJECT_CODE_FOLDER}/server/package.json" "./node_modules/package.json" || (
-  printf "${RED}*** ${PROJECT_CONTAINER}: package.json file has been modified - running npm install ***${NC}\n"; 
+  printf "${RED}*** package.json file has been modified - running npm install ***${NC}\n"; 
   npm config set loglevel="info"; 
   npm config set progress=false; 
-  sudo npm install ${PROJECT_CODE_FOLDER}/server/ 2>&1 && rm -R ./node_modules/kamadan-trade-server; 
-  cp -ura ${PROJECT_CODE_FOLDER}/server/package.json ./node_modules/package.json; 
+  sudo npm install ${PROJECT_CODE_FOLDER}/server/ 2>&1 && cp -ura ${PROJECT_CODE_FOLDER}/server/package.json ./node_modules/package.json;
+  rm -R ./node_modules/kamadan-trade-server;
   tar -zcf "${PROJECT_CODE_FOLDER}/server/node_modules.tar.gz" node_modules);
 
 # Combine all of the above commands into a single string. touch /tmp/forever.log && forever start -a -l /tmp/forever.log -o /tmp/forever.log -e /tmp/forever.log server.js
