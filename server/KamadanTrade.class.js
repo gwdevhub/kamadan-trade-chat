@@ -53,7 +53,12 @@ var KamadanTrade = {
   },
   search:function(term) {
     var self = this;
-    console.log(term);
+    term = ((term || '')+'').toLowerCase().trim();
+    if(term.indexOf('user:') == 0)
+      return this.getMessagesByUser(term.substring(0,5));
+    if(!term.length)
+      return Promise.resolve(this.live_message_log);
+    console.log("Searching messages for "+term);
     return this.init().then(function() {
       return new Promise(function(resolve,reject) {
         // Split string by spaces
@@ -71,7 +76,6 @@ var KamadanTrade = {
             console.error(err);
             return reject(err);
           }
-          console.log(rows);
           return resolve(rows);
         });
       });
@@ -152,14 +156,15 @@ var KamadanTrade = {
     });
     return message;
   },
-  getMessagesByUser:function(user) {
+  getMessagesByUser:function(term) {
     var self = this;
-    user = (user+'').trim();
-    if(!user.length)
+    term = ((term || '')+'').toLowerCase().trim();
+    if(!term.length)
       return Promise.resolve([]);
+    console.log("Searching user message for "+term);
     return this.init().then(function() {
       return new Promise(function(resolve,reject) {
-        self.db.all("SELECT h,t,s,m FROM trade_messages WHERE s LIKE ? GROUP BY m ORDER BY rowid DESC LIMIT "+live_message_log_max,[user],(err, rows ) => {
+        self.db.all("SELECT h,t,s,m FROM trade_messages WHERE s LIKE ? GROUP BY m ORDER BY rowid DESC LIMIT "+live_message_log_max,[term],(err, rows ) => {
           if(err) {
             console.error(err);
             return reject(err);

@@ -52,7 +52,7 @@ function init(cb) {
 	cb = cb || function(){}
 	console.log("\n---------- Starting Web Server ----------\n");
   var wssl;
-  var wss = new WebSocketServer({ port: 9090 });
+  var wss;
 	function configureWebServer(app) {
     'use strict';
 		if(!app)	app = express();
@@ -152,16 +152,7 @@ function init(cb) {
       res.sendFile(__dirname+'/index.html');
     });
     app.get('/s/:term', function(req,res) {
-      var term = ((req.params.term || req.query.term || '')+'').toLowerCase();
-      if(term.indexOf('user:') == 0) {
-        return KamadanTrade.getMessagesByUser(term.substring(5)).then(function(rows) {
-          res.json(rows);
-        }).catch(function(e) {
-          console.error(e);
-          res.json([]);
-        });
-      }
-      KamadanTrade.search(term).then(function(rows) {
+      KamadanTrade.search(req.params.term || req.query.term).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {
         console.error(e);
@@ -169,9 +160,7 @@ function init(cb) {
       });
     });
     app.get('/u/:user', function(req,res) {
-      var user = ((req.params.user || req.query.user || '')+'').toLowerCase();
-      console.log("By user: "+user);
-      KamadanTrade.getMessagesByUser(user).then(function(rows) {
+      KamadanTrade.getMessagesByUser(req.params.user || req.query.user).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {
         console.error(e);
@@ -198,21 +187,59 @@ function init(cb) {
     });
 		return app;
 	}
-	var listen_ports = [80];
-  var webserver = configureWebServer();
-	for(var i in listen_ports) {
-		webserver.listen(listen_ports[i]);
-		console.log("Listening for connections on port "+listen_ports[i]);
-	}
+  function configureWebsocketServer(server) {
+    var wss = new WebSocketServer({
+      server: server
+    });
+    
+    wss.on('connection', function(ws) {
+      ws.on('message', function(message) {
+        if(!message.length) return;
+        var obj;
+        try {
+          obj = JSON.parse(message);
+        } catch(e) {
+          console.error("Malformed websocket message");
+          console.log(message);
+          return;
+        }
+        if(obj.since) {
+          var rows = KamadanTrade.getMessagesSince(obj.since);
+          return ws.send(JSON.stringify({since:obj.since, num_results:rows.length,results:rows}));
+        }
+        if(obj.query) {
+          return KamadanTrade.search(obj.query).then(function(rows) {
+            ws.send(JSON.stringify({query:obj.query, num_results:rows.length,results:rows}));
+          }).catch(function(e) {
+            console.error(e);
+            ws.send(JSON.stringify({query:obj.query, num_results:0}));
+          });
+        }
+      });
+    });
+    return wss;
+  }
+	
+  // - Do the listening
+  var http_server = require('http').createServer();
+  var app = configureWebServer();
+  wss = configureWebsocketServer(http_server);
+  http_server.on('request', app);
+  http_server.listen(80, function() {
+    console.log("http/ws server listening on port 80");
+  });
   if(enable_https) {
     try {
       var https_server = https.createServer({
         key: fs.readFileSync(__dirname+'/key.pem'),
         cert: fs.readFileSync(__dirname+'/cert.pem'),
         passphrase: 'kamadan'
-      }, configureWebServer());
-      https_server.listen(443);
-      wssl = new WebSocketServer({port:8443,server:https_server});
+      });
+      wssl = configureWebsocketServer(https_server);
+      https_server.on('request', app);
+      https_server.listen(443, function() {
+        console.log("https/wss server listening on port 443");
+      });
       
     } catch(e) {
       console.error(e);

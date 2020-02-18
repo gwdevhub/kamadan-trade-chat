@@ -15,10 +15,13 @@ var KamadanClient = {
   last_search_date:null,
   search_results:[],
   messages:[],
+  getSearchTerm:function() {
+    return (this.search_input.value+'').trim();
+  },
   search:function(term) {
     if(term)
       this.search_input.value = term;
-    var term = (this.search_input.value+'').trim();
+    var term = this.getSearchTerm();
     // - 3000ms wait time between same searches
     if(term == this.last_search_term && this.last_search_date + 3000 > Date.now())
       return;
@@ -61,9 +64,9 @@ var KamadanClient = {
   init:function() {
     this.current_wrapper = document.getElementById('current-wrapper');
     this.search_input = document.getElementById('search-input');
-    this.websocket_url = "ws://"+window.location.hostname+":9090";
+    this.websocket_url = "ws://"+window.location.hostname+":80";
     if(window.location.protocol == 'https:') {
-      this.websocket_url = "wss://"+window.location.hostname+":8443";
+      this.websocket_url = "wss://"+window.location.hostname+":443";
     }
     var self = this;
     document.getElementById('home-link').addEventListener('click',function(e) {
@@ -113,7 +116,6 @@ var KamadanClient = {
     if (this.ws) {
       switch(this.ws.readyState) {
         case WebSocket.OPEN:
-          this.ws.send('');
         case WebSocket.CONNECTING:
         case WebSocket.CLOSING:
           return;
@@ -124,6 +126,7 @@ var KamadanClient = {
     this.ws.onopen = function(evt) {
       self.log("Websocket opened");
       self.setPollInterval(30000);
+      self.poll(true);
     }
     this.ws.onerror = function(evt) {
       self.error("Websocket error",evt);
@@ -144,7 +147,7 @@ var KamadanClient = {
   last_drawn_hash:'',
   redrawMessages:function(flush = false) {
     var html = '';
-    if(flush) {
+    if(!this.getSearchTerm().length) {
       document.getElementById('search-info').innerHTML = '';
     }
     var to_add = [];
@@ -278,10 +281,16 @@ var KamadanClient = {
     this.redrawMessages(true);
     document.getElementById('search-info').innerHTML = this.search_results.length+" results found for <i>"+(this.search_input.value+'').trim()+"</i>";
   },
-  poll:function() {
+  poll:function(force) {
     var self = this;
+    if(!force && self.ws && self.ws.readyState != WebSocket.CLOSED)
+        return;
     this.log("polling");
     function requeue() {
+      if(self.poller) {
+        clearTimeout(self.poller);
+        self.poller = null;
+      }
       self.poller = setTimeout(function() {
         self.poll();
       },self.poll_interval);
