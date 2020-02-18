@@ -4,7 +4,7 @@ $Linode = {
 	'plan' => 'Nanode 1GB',																	# Server Size to use
 	'distribution' => 'Debian 8',														# Operating system to run
 	'datacenter' => 'singapore',														# Physical location of server
-	'api_key' => 't103hrBLED7xjvmn3wxh0tMNw4NmhbkdO75Wdm5GJg2jKsxZd7FYvbwNggCp76LE',	# Linode account api_key
+	'api_key' => 'aaaa',	# Linode account api_key
 }
 # ------------------ DO NOT EDIT BELOW THIS LINE ------------------
 if Machines['Linode'].nil? == false && Machines['Linode'].empty? == false

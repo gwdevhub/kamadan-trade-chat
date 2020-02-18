@@ -17,8 +17,8 @@ var KamadanClient = {
     var self = this;
     var req = new XMLHttpRequest();
     req.addEventListener("load", function() {
-      window.scrollTo(0,0);
       if(!this.response.length) return;
+      var result;
       try {
         result = JSON.parse(this.response);
       } catch(e) {
@@ -31,11 +31,11 @@ var KamadanClient = {
     req.send();
   },
   setPollInterval:function(ms) {
-    this.poll_interval = Math.max(120000,ms);
+    this.poll_interval = Math.min(120000,ms);
     console.log("Poll interval set to "+ms+"ms");
   },
   setWebsocketInterval:function(ms) {
-    this.ws_interval = Math.max(120000,ms);
+    this.ws_interval = Math.min(120000,ms);
     console.log("Websocket interval set to "+ms+"ms");
   },
   getLastMessage:function() {
@@ -116,7 +116,9 @@ var KamadanClient = {
         if(data && data.h)
           self.parseMessages([data]);
       }
-      catch(e) {}
+      catch(e) {
+        console.error(e);        
+      }
     };
   },
   last_drawn_hash:'',
@@ -146,6 +148,7 @@ var KamadanClient = {
     }
     // Use document fragment to prepend if available.
     if(flush) {
+      window.scrollTo(0,0);
       this.current_wrapper.innerHTML = html;
     } else {
       this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
