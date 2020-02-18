@@ -61,6 +61,7 @@ function init(cb) {
       app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
 		//app.use(cookieParser());		// Used for parsing cookies (i.e. user tokens)
 		// Set upper limits for request body via POST
+    app.use(bodyParser.text({limit: limit_bytes, extended: true, parameterLimit:50000}));
 		app.use(bodyParser.json({limit: limit_bytes, extended: true, parameterLimit:50000}));
 		app.use(bodyParser.urlencoded({limit: limit_bytes, extended: true, parameterLimit:50000}));
 
@@ -91,6 +92,7 @@ function init(cb) {
 		let two_week_cache = expressCacheOptions(14*24*60*60*1000);
     let two_year_cache = expressCacheOptions(2*365*24*60*60*1000);
 		app.use('/.well-known/pki-validation',express.static(__dirname + '/.well-known/pki-validation',two_week_cache));
+    app.use('/.well-known/acme-challenge',express.static(__dirname + '/.well-known/acme-challenge',two_week_cache));
 		app.use(/^\/images([0-9]{14})?/,express.static(__dirname + '/images',two_year_cache));
 		app.use(/^\/css([0-9]{14})?/,express.static(__dirname + '/css',two_year_cache));
 		app.use(/^\/js([0-9]{14})?/,express.static(__dirname + '/js',two_year_cache));

@@ -69,8 +69,19 @@ var KamadanTrade = {
   },
   addMessage:function(req) {
     var message;
+    var body = req.body || '';
+    if(typeof body == 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch(e) {}
+    }
+    if(!body || !body.sender || !body.message || !body.timestamp) {
+      console.error("Missing sender/message/timestamp when creating trade message");
+      console.log(body);
+      return false;
+    }
     try {
-      message = {s:(req.body.sender+'').trim(),m:(req.body.message+'').trim(),t:req.body.timestamp};
+      message = {s:(req.body.sender+'').trim(),m:(req.body.message+'').trim(),t:(req.body.timestamp+'').substr(0,10)};
     } catch(e) {
       console.error("Failed to parse message from request");
       console.error(e);

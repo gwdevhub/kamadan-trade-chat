@@ -1,6 +1,15 @@
 var KamadanClient = {
   poll_interval:3000,
   ws_interval:20000,
+  debug:/local/.test(window.location.hostname),
+  log:function() {
+    if(!this.debug) return;
+    console.log.apply(console,arguments);
+  },
+  error:function() {
+    if(!this.debug) return;
+    console.error.apply(console,arguments);
+  },
   max_messages:100,
   search_results:[],
   messages:[],
@@ -23,7 +32,7 @@ var KamadanClient = {
       try {
         result = JSON.parse(this.response);
       } catch(e) {
-        console.error(e);
+        self.error(e);
         return;
       }
       self.parseSearchResults(result);
@@ -33,11 +42,11 @@ var KamadanClient = {
   },
   setPollInterval:function(ms) {
     this.poll_interval = Math.min(120000,ms);
-    console.log("Poll interval set to "+ms+"ms");
+    this.log("Poll interval set to "+ms+"ms");
   },
   setWebsocketInterval:function(ms) {
     this.ws_interval = Math.min(120000,ms);
-    console.log("Websocket interval set to "+ms+"ms");
+    this.log("Websocket interval set to "+ms+"ms");
   },
   getLastMessage:function() {
     return this.messages ? this.messages[0] : null;
@@ -106,11 +115,11 @@ var KamadanClient = {
     var self=this;
     this.ws = new WebSocket(this.websocket_url);
     this.ws.onopen = function(evt) {
-      console.log("Websocket opened");
+      self.log("Websocket opened");
       self.setPollInterval(30000);
     }
     this.ws.onerror = function(evt) {
-      console.error("Websocket error",evt);
+      self.error("Websocket error",evt);
       self.setPollInterval(3000);
     }
     this.ws.onmessage = function(evt) {
@@ -121,7 +130,7 @@ var KamadanClient = {
           self.parseMessages([data]);
       }
       catch(e) {
-        console.error(e);        
+        self.error(e);        
       }
     };
   },
@@ -264,12 +273,12 @@ var KamadanClient = {
   },
   poll:function() {
     var self = this;
-    console.log("polling");
+    this.log("polling");
     function requeue() {
       self.poller = setTimeout(function() {
         self.poll();
       },self.poll_interval);
-      console.log("Poll queued");
+      self.log("Poll queued");
     }
     var req = new XMLHttpRequest();
     req.addEventListener("load", function() {
@@ -279,7 +288,7 @@ var KamadanClient = {
       try {
         result = JSON.parse(this.response);
       } catch(e) {
-        console.error(e);
+        self.error(e);
         return requeue();
       }
       if (!self.ws || self.ws.readyState != WebSocket.OPEN)
