@@ -1,6 +1,7 @@
 var KamadanClient = {
   poll_interval:3000,
   ws_interval:20000,
+  max_messages:100,
   search_results:[],
   messages:[],
   search:function(term) {
@@ -189,7 +190,7 @@ var KamadanClient = {
       json[i].t = new Date(json[i].t * 1000);
       has_new = this.messages.unshift(json[i]);
     }
-    while(this.messages.length > 300) {
+    while(this.messages.length > this.max_messages) {
       this.messages.pop();
     }
     if(has_new) {
