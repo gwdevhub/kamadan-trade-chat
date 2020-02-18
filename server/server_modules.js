@@ -5,3 +5,4 @@ morgan      = require('morgan');
 WebSocketServer = require('ws').Server;
 ServerConfig = require(__dirname+'/ServerConfig.class.js');
 lockFile = require('lockfile');
+https = require('https');

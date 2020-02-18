@@ -3,6 +3,8 @@ process.env.NODE_PATH = "../node_modules";
 require("module").Module._initPaths();
 var fs = fs || require('fs');
 
+var enable_https = false;
+
 // Valid source IP Addresses that can submit new trade messages
 var whitelisted_sources = [
 '127.0.0.1',
@@ -49,6 +51,7 @@ function init(cb) {
   });
 	cb = cb || function(){}
 	console.log("\n---------- Starting Web Server ----------\n");
+  var wssl;
   var wss = new WebSocketServer({ port: 9090 });
 	function configureWebServer(app) {
     'use strict';
@@ -130,6 +133,11 @@ function init(cb) {
             wss.clients.forEach(function each(client) {
               client.send(added_message);
             });
+            if(wssl) {
+              wssl.clients.forEach(function each(client) {
+                client.send(added_message);
+              });
+            }
           }
         } catch(e) { 
           console.error(e);
@@ -189,10 +197,25 @@ function init(cb) {
 		return app;
 	}
 	var listen_ports = [80];
+  var webserver = configureWebServer();
 	for(var i in listen_ports) {
-		configureWebServer().listen(listen_ports[i]);
+		webserver.listen(listen_ports[i]);
 		console.log("Listening for connections on port "+listen_ports[i]);
 	}
+  if(enable_https) {
+    try {
+      var https_server = https.createServer({
+        key: fs.readFileSync(__dirname+'/key.pem'),
+        cert: fs.readFileSync(__dirname+'/cert.pem'),
+        passphrase: 'kamadan'
+      }, configureWebServer());
+      https_server.listen(443);
+      wssl = new WebSocketServer({port:8443,server:https_server});
+      
+    } catch(e) {
+      console.error(e);
+    }
+  }
 	console.log("\n--------------------------------\n");
 	cb.apply(this);
 }

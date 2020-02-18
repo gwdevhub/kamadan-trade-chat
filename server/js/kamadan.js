@@ -45,7 +45,10 @@ var KamadanClient = {
   init:function() {
     this.current_wrapper = document.getElementById('current-wrapper');
     this.search_input = document.getElementById('search-input');
-    
+    this.websocket_url = "ws://"+window.location.hostname+":9090";
+    if(window.location.protocol == 'https:') {
+      this.websocket_url = "wss://"+window.location.hostname+":8443";
+    }
     var self = this;
     document.getElementById('home-link').addEventListener('click',function(e) {
       e.preventDefault();
@@ -101,7 +104,7 @@ var KamadanClient = {
       }
     }
     var self=this;
-    this.ws = new WebSocket("ws://"+window.location.hostname+":9090");
+    this.ws = new WebSocket(this.websocket_url);
     this.ws.onopen = function(evt) {
       console.log("Websocket opened");
       self.setPollInterval(30000);
@@ -153,6 +156,7 @@ var KamadanClient = {
       this.current_wrapper.innerHTML = html;
     } else {
       this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
+      this.checkAndNotify(to_add);
     }
     this.timestamps();
     this.animations();
@@ -166,6 +170,29 @@ var KamadanClient = {
           rows[i].innerHTML = ts;
       }
     } catch(e) {}
+  },
+  checkAndNotify:function(new_messages) {
+    // Cycles through these messages, if a match for notification is found, do it
+    if(!window.Notification || window.Notification.permission == 'denied' || window.location.protocol != 'https:')
+      return;
+    var self = this;
+    if (Notification.permission != "granted") {
+      return Notification.requestPermission().then(function (permission) {
+        checkAndNotify(new_messages);
+      });
+    }
+    var alert_checks = /wts/i;
+    var notification;
+    for(var i=0;i<new_messages.length && !notification;i++) {
+      if(!alert_checks.test(new_messages[i].m))
+        continue;
+      var n = {
+        body:new_messages[i].s+': '+new_messages[i].m
+      };
+      if(getFavicon())
+        n.icon = getFavicon();
+      notification = new Notification("New trade message",n);
+    }
   },
   animations:function() {
     var rows = document.querySelectorAll('.unanimated');
@@ -269,7 +296,20 @@ var KamadanClient = {
     req.send();
   }
 };
-
+var favicon;
+function getFavicon(){
+  if(favicon)
+    return favicon;
+  var nodeList = document.getElementsByTagName("link");
+  for (var i = 0; i < nodeList.length; i++)
+  {
+      if((nodeList[i].getAttribute("rel") == "icon")||(nodeList[i].getAttribute("rel") == "shortcut icon"))
+      {
+          favicon = nodeList[i].getAttribute("href");
+      }
+  }
+  return favicon;        
+}
 function HTML2DocumentFragment(markup) {
   if (markup.toLowerCase().trim().indexOf('<!doctype') === 0) {
       let doc = document.implementation.createHTMLDocument("");
