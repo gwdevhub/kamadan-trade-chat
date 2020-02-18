@@ -44,7 +44,13 @@ var KamadanClient = {
   init:function() {
     this.current_wrapper = document.getElementById('current-wrapper');
     this.search_input = document.getElementById('search-input');
+    
     var self = this;
+    document.getElementById('home-link').addEventListener('click',function(e) {
+      e.preventDefault();
+      self.search_input.value = '';
+      self.redrawMessages(true);
+    });
     this.loadMessages();
     window.addEventListener("beforeunload", function(event) {
       self.saveMessages(true);
