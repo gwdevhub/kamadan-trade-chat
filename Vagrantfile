@@ -1,3 +1,11 @@
+# NOTES:
+# https://github.com/bdwyertech/vagrant-aws works on windows?
+#
+#
+#
+#
+#
+ENV["VAGRANT_DISABLE_RESOLV_REPLACE"] = "1"
 ENV["VAGRANT_DETECTED_OS"] = ENV["VAGRANT_DETECTED_OS"].to_s + " cygwin" if RUBY_PLATFORM.include? "mingw"		# Fix folder structure for Cygwin installations
 ENV["VAGRANT_DEFAULT_PROVIDER"] = "virtualbox"		# Use VirtualBox by default.
 ENV["VAGRANT_PREFER_SYSTEM_BIN"] = "0"				# Avoid conflicting versions of SSH with cygwin etc
@@ -6,8 +14,7 @@ ENV["VAGRANT_USE_VAGRANT_TRIGGERS"] = "1"			#
 Vagrant.require_version ">= 2.1.0"	# 2.1.0 required for vagrant triggers.
 $config_folder = "#{File.dirname(__FILE__)}/VagrantConfig"		# Folder where all required files are, escaping any spaces. Make sure this exists!!
 $rsync_folder_excludes = {		# Any folders that you don't want to rsync to the server.
-	"." => "/vagrant",
-  "server/node_modules" => "/home/vagrant/kamadan-trade-chat/server/node_modules"
+	"." => "/vagrant"
 }
 
 # ------------------	Vagrant Pre-Includes	------------------ #
@@ -85,9 +92,26 @@ Machines = {
 			'hostnames' => ['local.kamadan.com'],	# With virtualbox, the first item is added to hosts file, then removed for further processing (see VagrantConfig/Functions.rb)
 			'server_config' => local_config,
 			'ip_address' => '10.10.10.51',
+      'deployment_script'=>'deploy.sh',
 			'code_to_provision' => 'local'
 		}
+	},
+  'ManagedServers' => {
+		'staging' => {
+			'ip_address' => '18.202.80.59',
+			'server_config' => local_config.merge({
+				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
+        'is_cloud'=>1
+			}),
+			'code_to_provision' => 'local',
+			#'rsync_path' => '~/local/bin/rsync',	# Custom rsync binary on server.
+			'deployment_script' => 'deploy.sh',
+			'prompt_user_before_provision' => 0,
+			'ssh_username' => 'ubuntu',
+			'os' => 'linux'
+		}
 	}
+  
 }
 
 Vagrant.configure("2") do |config|

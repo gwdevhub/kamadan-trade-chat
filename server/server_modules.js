@@ -3,6 +3,7 @@ bodyParser  = require('body-parser');
 KamadanTrade = require(__dirname+'/KamadanTrade.class.js').KamadanTrade;
 morgan      = require('morgan');
 WebSocketServer = require('ws').Server;
+ServerConfig = require(__dirname+'/ServerConfig.class.js');
 /*
 mongoose    = require(__dirname+'/app/OneQDatabase.js');
 evalStr = '';

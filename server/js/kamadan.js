@@ -3,13 +3,21 @@ var KamadanClient = {
   ws_interval:20000,
   search_results:[],
   messages:[],
-  search:function() {
+  search:function(term) {
+    if(term)
+      this.search_input.value = term;
     var term = (this.search_input.value+'').trim();
+    var endpoint = '/s/';
+    if(term.indexOf('user:') == 0) {
+      term = term.substring(5);
+      endpoint = '/u/';
+    }
     if(!term.length)
       return;
     var self = this;
     var req = new XMLHttpRequest();
     req.addEventListener("load", function() {
+      window.scrollTo(0,0);
       if(!this.response.length) return;
       try {
         result = JSON.parse(this.response);
@@ -19,7 +27,7 @@ var KamadanClient = {
       }
       self.parseSearchResults(result);
     });
-    req.open("GET", "/s/"+encodeURIComponent(term));
+    req.open("GET", endpoint+encodeURIComponent(term));
     req.send();
   },
   setPollInterval:function(ms) {
@@ -34,8 +42,13 @@ var KamadanClient = {
     return this.messages ? this.messages[0] : null;
   },
   init:function() {
+    this.current_wrapper = document.getElementById('current-wrapper');
     this.search_input = document.getElementById('search-input');
     var self = this;
+    this.loadMessages();
+    window.addEventListener("beforeunload", function(event) {
+      self.saveMessages(true);
+    });
     document.getElementById('search-form').addEventListener('submit', function(e) {
       e.preventDefault();
       self.search();
@@ -54,6 +67,11 @@ var KamadanClient = {
     setInterval(function() {
       self.timestamps();
     },1000);
+    document.getElementById('current-wrapper').addEventListener('click',function(e){
+      if(e.target && e.target.className == 'name') {
+        self.search('user:'+e.target.textContent);
+      }
+   });
     this.setPollInterval(3000);
     this.setWebsocketInterval(20000);
     this.pollWebsocket();
@@ -97,9 +115,8 @@ var KamadanClient = {
   },
   last_drawn_hash:'',
   redrawMessages:function(flush = false) {
-    var html = document.getElementById('current-wrapper').innerHTML;
+    var html = '';
     if(flush) {
-      html = '';
       document.getElementById('search-info').innerHTML = '';
     }
     var to_add = [];
@@ -121,15 +138,24 @@ var KamadanClient = {
         <td class="message">'+messages[i].m+'</td>\
       </tr>' + html;
     }
-    document.getElementById('current-wrapper').innerHTML = html;
+    // Use document fragment to prepend if available.
+    if(flush) {
+      this.current_wrapper.innerHTML = html;
+    } else {
+      this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
+    }
     this.timestamps();
     this.animations();
   },
   timestamps:function() {
     var rows = document.querySelectorAll('.age');
-    for(var i=0;i<rows.length;i++) {
-      rows[i].innerHTML = (new Date(parseInt(rows[i].getAttribute('data-timestamp')))).relativeTime();
-    }
+    try {
+      for(var i=0;i<rows.length;i++) {
+        var ts = (new Date(parseInt(rows[i].getAttribute('data-timestamp')))).relativeTime();
+        if(rows[i].innerHTML != ts)
+          rows[i].innerHTML = ts;
+      }
+    } catch(e) {}
   },
   animations:function() {
     var rows = document.querySelectorAll('.unanimated');
@@ -154,8 +180,38 @@ var KamadanClient = {
       json[i].t = new Date(json[i].t * 1000);
       has_new = this.messages.unshift(json[i]);
     }
-    if(has_new)
+    while(this.messages.length > 300) {
+      this.messages.pop();
+    }
+    if(has_new) {
       this.redrawMessages();
+      this.saveMessages(); 
+    }
+  },
+  loadMessages:function() {
+    if(!window.localStorage) return;
+    this.messages = [];
+    try {
+      this.messages = JSON.parse(window.localStorage.getItem('messages'))
+    } catch(e) {    };
+    if(!this.messages || !this.messages.length)
+      return;
+    for(var i in this.messages) {
+      this.messages[i].t = new Date(this.messages[i].t);
+    }
+    this.redrawMessages();
+  },
+  saveMessages:function(force = false) {
+    if(!window.localStorage) return;
+    if(this.pendingSave && !force) return;
+    var self=this;
+    var doSave = function() {
+      window.localStorage.setItem('messages',JSON.stringify(self.messages));
+      self.pendingSave = null;
+    };
+    if(force)
+      doSave();
+    this.pendingSave = setTimeout(doSave,5000);
   },
   parseSearchResults:function(json) {
     var latest_message = (this.getLastMessage() || {'h':''});
@@ -203,5 +259,27 @@ var KamadanClient = {
     req.send();
   }
 };
+
+function HTML2DocumentFragment(markup) {
+  if (markup.toLowerCase().trim().indexOf('<!doctype') === 0) {
+      let doc = document.implementation.createHTMLDocument("");
+      doc.documentElement.innerHTML = markup;
+      return doc;
+  } else if ('content' in document.createElement('template')) {
+      // Template tag exists!
+      let el = document.createElement('template');
+      el.innerHTML = markup;
+      return el.content;
+  } else {
+      // Template tag doesn't exist!
+      var docfrag = document.createDocumentFragment();
+      let el = document.createElement('body');
+      el.innerHTML = markup;
+      for (let i = 0; 0 < el.childNodes.length;) {
+          docfrag.appendChild(el.childNodes[i]);
+      }
+      return docfrag;
+  }
+}
 
 KamadanClient.init();

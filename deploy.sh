@@ -4,9 +4,10 @@ echo $@
 echo "End Args."
 RED='\033[36m'
 NC='\033[0m' # No Color
-#APP_DOMAIN='local.pricecheck.pebbledesign.com'
 APP_DOMAIN=$1
-PROJECT_CODE_FOLDER=$2
+#PROJECT_CODE_FOLDER=$2
+PROJECT_CODE_FOLDER="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+printf "${RED}*** Project code folder is ${PROJECT_CODE_FOLDER} ***${NC}\n";
 SERVER_TIMEZONE="UTC"
 
 DOMAINS=${APP_DOMAIN}
@@ -23,7 +24,7 @@ export NODE_ENV=production;
 # NOTE: NodeJS is also installed at this stage via https://deb.nodesource.com/setup_6.x
 
 sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
-  printf "${RED}*** ${PROJECT_CONTAINER}: Installing missing packages via apt-get ***${NC}\n";
+  printf "${RED}*** Installing missing packages via apt-get ***${NC}\n";
   sudo apt-get update && sudo apt-get install -y apt-transport-https build-essential curl;
   sudo curl -sL https://deb.nodesource.com/setup_12.x | sudo bash -;
   sudo apt-get install -y ${REQUIRED_PACKAGES});
@@ -34,7 +35,7 @@ sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
 # 3. Check to see if the package.json has been modified (via shasum), delete existing package.json and run npm install if it has.
 # 4. Finally, repack the node_modules folder to flag it as modified - a Git commit will upload the new archive when the developer saves their changes.
 
-printf "${RED}*** ${PROJECT_CONTAINER}: Installing any missing node_modules ***${NC}\n";
+printf "${RED}*** Installing any missing node_modules ***${NC}\n";
 forever --help 2>/dev/null > /dev/null || sudo npm install forever -g;
 cd ~; 
 rm -R ./node_modules; 
@@ -44,7 +45,7 @@ cmp -s "${PROJECT_CODE_FOLDER}/server/package.json" "./node_modules/package.json
   printf "${RED}*** ${PROJECT_CONTAINER}: package.json file has been modified - running npm install ***${NC}\n"; 
   npm config set loglevel="info"; 
   npm config set progress=false; 
-  npm install ${PROJECT_CODE_FOLDER}/server/ 2>&1 && rm -R ./node_modules/kamadan-trade-server; 
+  sudo npm install ${PROJECT_CODE_FOLDER}/server/ 2>&1 && rm -R ./node_modules/kamadan-trade-server; 
   cp -ura ${PROJECT_CODE_FOLDER}/server/package.json ./node_modules/package.json; 
   tar -zcf "${PROJECT_CODE_FOLDER}/server/node_modules.tar.gz" node_modules);
 

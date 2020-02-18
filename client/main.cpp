@@ -1,5 +1,7 @@
 #include "main.h"
 
+#define SERVER_HOST "18.202.80.59"
+
 struct TradeMessage {
     time_t    timestamp = 0;
     std::string name;
@@ -59,6 +61,8 @@ namespace {
         #endif
 
         MessageSender = std::thread([]() {
+            char url[64];
+            snprintf(url,64,"http://%s/add", SERVER_HOST);
             while (running) {
                 Sleep(100);
                 if (to_send.empty())
@@ -69,7 +73,7 @@ namespace {
                 printf("Sending trade message to server... ");
                 try {
                     // you can pass http::InternetProtocol::V6 to Request to make an IPv6 request
-                    http::Request request("http://localhost/add");
+                    http::Request request(url);
 
                     // pass parameters as a map
                     std::map<std::string, std::string> parameters = {

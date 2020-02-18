@@ -19,7 +19,7 @@ var KamadanTrade = {
     this.initted = this.initting = true;
     var self = this;
     return new Promise(function(resolve,reject) {
-      var db = new sqlite3.Database('./database.db', (err) => {
+      var db = new sqlite3.Database(__dirname+'/database.db', (err) => {
         self.initting = false;
         if (err) {
           console.error(err.message);
@@ -57,7 +57,7 @@ var KamadanTrade = {
   addMessage:function(req) {
     var message;
     try {
-      message = {s:req.body.sender+'',m:req.body.message+'',t:req.body.timestamp};
+      message = {s:(req.body.sender+'').trim(),m:(req.body.message+'').trim(),t:req.body.timestamp};
     } catch(e) {
       console.error("Failed to parse message from request");
       console.error(e);
@@ -128,7 +128,7 @@ var KamadanTrade = {
           return reject(err);
         }
         self.live_message_log = rows;
-        self.last_message = self.live_message_log[self.live_message_log.length-1];
+        self.last_message = self.live_message_log[0];
         console.log(self.live_message_log.length+" messages retrieved from db");
         resolve();
       });

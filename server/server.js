@@ -1,10 +1,25 @@
 console.log("Initializing node server...");
-process.env.NODE_PATH = "/home/node_modules";
+process.env.NODE_PATH = "../node_modules";
 require("module").Module._initPaths();
 var fs = fs || require('fs');
 
 // Valid source IP Addresses that can submit new trade messages
-var whitelisted_sources = ['127.0.0.1'];
+var whitelisted_sources = [
+'127.0.0.1',
+'142.44.211.74', // Greg
+'176.248.118.201'// Me
+];
+
+var last_gc = 0;
+function garbage_collect() {
+  let t = (new Date()).getTime();
+  if(t - last_gc < 10000)
+    return; // Too soon
+  if(global && global.gc)
+    global.gc();
+  last_gc = t;
+}
+setInterval(garbage_collect,10000);
 
 function loadModules(cb) {
 	cb = cb || function(){};
@@ -24,8 +39,12 @@ function loadHelperFunctions(cb) {
 	console.log("\n--------------------------------\n");
 	return cb.apply(this);
 }
+var cached_message_log = "[]";
 function init(cb) {
-  KamadanTrade.init();
+  KamadanTrade.init().then(function() {
+    console.log("got log");
+    cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+  });
 	cb = cb || function(){}
 	console.log("\n---------- Starting Web Server ----------\n");
   var wss = new WebSocketServer({ port: 9090 });
@@ -33,8 +52,8 @@ function init(cb) {
     'use strict';
 		if(!app)	app = express();
 		var limit_bytes = 1024*1024*1;	// 1 MB limit.
-
-		app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
+    if(ServerConfig.isLocal())
+      app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
 		//app.use(cookieParser());		// Used for parsing cookies (i.e. user tokens)
 		// Set upper limits for request body via POST
 		app.use(bodyParser.json({limit: limit_bytes, extended: true, parameterLimit:50000}));
@@ -73,7 +92,7 @@ function init(cb) {
 		app.use(/^\/fonts([0-9]{14})?/,express.static(__dirname + '/fonts',two_year_cache));
 		app.use('/favicon.ico',function(req,res,next) {return res.redirect(301,'/images/favicon.ico');});
 		
-    var cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+    
     
     function getIP(req) {
       return (req.header('x-forwarded-for') || req.connection.remoteAddress).split(':').pop();
@@ -114,6 +133,14 @@ function init(cb) {
     });
     app.get('/s/:term', function(req,res) {
       var term = ((req.params.term || req.query.term || '')+'').toLowerCase();
+      if(term.indexOf('user:') == 0) {
+        return KamadanTrade.getMessagesByUser(term.substring(5)).then(function(rows) {
+          res.json(rows);
+        }).catch(function(e) {
+          console.error(e);
+          res.json([]);
+        });
+      }
       KamadanTrade.search(term).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {

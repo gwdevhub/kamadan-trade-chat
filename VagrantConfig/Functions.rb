@@ -237,7 +237,7 @@ def machine_setup(machine, machine_name, machine_properties)
 		else
 			machine.vm.synced_folder '.',"#{machine_properties['server_config']['repository_code_folder']}", type: 'rsync',
 				rsync__args: $rsync_args,
-				rsync__exclude: [".git/","VagrantConfig/","Vagrantfile","ssh/","server_config.json"] + (machine_properties['rsync_path'] || []),
+				rsync__exclude: [".git/","VagrantConfig/","Vagrantfile","ssh/","client/","server_config.json"],
 				rsync__auto: false,
 				mount_options: ["dmode=775,fmode=755"],
 				rsync__rsync_path: machine_properties['rsync_path'] || "rsync"
