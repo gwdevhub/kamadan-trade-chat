@@ -87,9 +87,22 @@ var KamadanTrade = {
       console.error(e);
       return false;
     }
+    console.log("incoming message");
+    console.log(message);
     // Parse timestamp
     try {
-      message.t = (new Date(parseInt(message.t))).getTime();
+      var d = new Date(parseInt(message.t,10) * 1000);
+      console.log(d, d.getTime());
+      message.t = d.getTime();
+      // - Check for wrong timezone.
+      var diff_hours = Math.round((message.t - Date.now()) / 36e5);
+      if(diff_hours != 0) {
+        message.t += diff_hours * 36e5;
+        console.log("Timezone for incoming timestamp "+message.t+" adjusted by "+diff_hours+" hours to be "+message.t);
+      }
+      message.t = parseInt((message.t+'').substring(0,10),10);
+      // Fuck it, just use current unix timestamp.
+      message.t = Math.round(Date.now() / 1000);
     } catch(e) {
       console.error("Failed to parse timestamp "+message.t);
       console.error(e);
