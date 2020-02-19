@@ -18,7 +18,7 @@ Client/Server solution to read in trade messages and provide a web front-end. Us
 * See live examples of the below API endpoints on the HTML page @ http://localhost/
 
 ---
-__Endpoint:__ ws://localhost:9090<br/>
+__Endpoint:__ ws://localhost:80<br/>
 __Description:__ Websocket connection, allows clients to receive message in real-time as they come in.<br/>
 __Example:__
 ```
