@@ -13,7 +13,7 @@ SERVER_TIMEZONE="UTC"
 DOMAINS=${APP_DOMAIN}
 DEFAULT_DOMAIN=${APP_DOMAIN}
 
-REQUIRED_PACKAGES='apt-transport-https build-essential curl software-properties-common tesseract-ocr tor nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1'
+REQUIRED_PACKAGES='apt-transport-https build-essential curl chronyd software-properties-common tesseract-ocr tor nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1'
 
 sudo ln -sf /usr/share/zoneinfo/${SERVER_TIMEZONE} /etc/localtime; 
 export NODE_ENV=production; 
@@ -28,7 +28,10 @@ sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
   sudo apt-get update && sudo apt-get install -y apt-transport-https build-essential curl;
   sudo curl -sL https://deb.nodesource.com/setup_12.x | sudo bash -;
   sudo apt-get install -y ${REQUIRED_PACKAGES});
-    
+  
+# On Ubuntu > 16.04, run chronyd -q to make sure the time is up-to-date
+sudo chronyd -q
+
 # NodeJS process:
 # 1. Install forever package if not present
 # 2. cd to /home directory and unpack node_modules.tar.gz into here.
