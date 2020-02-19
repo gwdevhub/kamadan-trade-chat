@@ -150,8 +150,6 @@ var KamadanTrade = {
       console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"s diff");
       return last_user_msg;
     }
-    message.s = message.s.unUnicodeArray();
-    
     this.last_message_by_user[message.s] = message;
     // live message log
     this.live_message_log.unshift(message);
