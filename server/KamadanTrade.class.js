@@ -7,7 +7,23 @@ function sleep(ms) {
     setTimeout(resolve, ms);
   });
 } 
-
+String.prototype.unUnicodeArray = String.prototype.unUnicodeArray || function() {
+  var str = this.trim();
+  if(/^\[.*\]$/.test(str)) {
+    // This is an array or char codes e.g. [19712, 27448, 19734, 58931456]
+    try {
+      var arr = JSON.parse(str); // Should be parsable
+      var new_str = '';
+      for(var i in arr) {
+        new_str += String.fromCharCode(arr[i]);
+      }
+      str = new_str;
+    } catch(e) {
+      // idgaf
+    }
+  }
+  return str;
+}
 var KamadanTrade = {
   flood_timeout:10, // Seconds to avoid user spamming trade chat i.e. 10s between the same message
   live_message_log:[],
@@ -134,6 +150,8 @@ var KamadanTrade = {
       console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"s diff");
       return last_user_msg;
     }
+    message.s = message.s.unUnicodeArray();
+    
     this.last_message_by_user[message.s] = message;
     // live message log
     this.live_message_log.unshift(message);
