@@ -4,16 +4,15 @@ echo $@
 echo "End Args."
 RED='\033[36m'
 NC='\033[0m' # No Color
-APP_DOMAIN=$1
+DB_USER=$1
+DB_PASS=$2
+DB_SCHEMA=$3
 #PROJECT_CODE_FOLDER=$2
 PROJECT_CODE_FOLDER="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 printf "${RED}*** Project code folder is ${PROJECT_CODE_FOLDER} ***${NC}\n";
 SERVER_TIMEZONE="UTC"
 
-DOMAINS=${APP_DOMAIN}
-DEFAULT_DOMAIN=${APP_DOMAIN}
-
-REQUIRED_PACKAGES='apt-transport-https build-essential curl chronyd software-properties-common tesseract-ocr tor nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1'
+REQUIRED_PACKAGES='apt-transport-https build-essential curl chrony mariadb-server software-properties-common tesseract-ocr tor nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1'
 
 sudo ln -sf /usr/share/zoneinfo/${SERVER_TIMEZONE} /etc/localtime; 
 export NODE_ENV=production; 
@@ -30,7 +29,23 @@ sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
   sudo apt-get install -y ${REQUIRED_PACKAGES});
   
 # On Ubuntu > 16.04, run chronyd -q to make sure the time is up-to-date
-sudo chronyd -q
+#sudo chronyd -q
+
+# MariaDB process:
+# 1. Try to login as nodejs user - if success, all is ok
+# 2. Create user, allow access from external source
+# 3. Run seed script
+
+cmp -s "/etc/mysql/mariadb.conf.d/zz_project.cnf" "${PROJECT_CODE_FOLDER}/server/my.cnf" || (
+  printf "${RED}*** Configuring mariadb database: copying over ${PROJECT_CODE_FOLDER}/server/my.cnf ***${NC}\n";
+  sudo cp -ura "${PROJECT_CODE_FOLDER}/server/my.cnf" "/etc/mysql/mariadb.conf.d/zz_project.cnf";
+  sudo service mysql restart);
+sudo mysql -u ${DB_USER} -p${DB_PASS} -e "show processlist;" || (
+  printf "${RED}*** Configuring mariadb database: setting up user ${DB_USER} ***${NC}\n";
+  sudo mysql -u root -e "FLUSH PRIVILEGES;CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"; 
+  sudo mysql -u root -e "GRANT ALL PRIVILEGES ON * . * TO '${DB_USER}'@'%';FLUSH PRIVILEGES;";
+  sudo service mysql restart);
+sudo mysql -u ${DB_USER} -p${DB_PASS} -e "CREATE DATABASE IF NOT EXISTS `${DB_SCHEMA}` COLLATE 'utf8mb4_general_ci';";
 
 # NodeJS process:
 # 1. Install forever package if not present

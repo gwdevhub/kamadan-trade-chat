@@ -72,7 +72,11 @@ server_config = {
 	'is_rackspace'=>0,
 	'is_linode'=>0,
 	'deployment_date'=>Time.now.strftime("%Y%m%d%H%M%S"),
-  'repository_code_folder'=>'/home/vagrant/kamadan-trade-chat'
+  'repository_code_folder'=>'/home/vagrant/kamadan-trade-chat',
+  'db_user'=>'nodejs',
+  'db_host'=>'127.0.0.1',
+  'db_schema'=>'kamadan',
+  'db_pass'=>'K4maDan1423!'
 }
 
 local_config = Marshal::load(Marshal.dump(server_config))
@@ -92,7 +96,10 @@ Machines = {
 			'hostnames' => ['local.kamadan.com'],	# With virtualbox, the first item is added to hosts file, then removed for further processing (see VagrantConfig/Functions.rb)
 			'server_config' => local_config,
 			'ip_address' => '10.10.10.51',
-      'deployment_script'=>'deploy.sh',
+      'deployment_script'=>{
+        'path' => 'deploy.sh',
+        'args' => [server_config['db_user'], server_config['db_pass'], server_config['db_schema']]
+      },
 			'code_to_provision' => 'local'
 		}
 	},
@@ -105,7 +112,10 @@ Machines = {
 			}),
 			'code_to_provision' => 'local',
 			#'rsync_path' => '~/local/bin/rsync',	# Custom rsync binary on server.
-			'deployment_script' => 'deploy.sh',
+			'deployment_script'=>{
+        'path' => 'deploy.sh',
+        'args' => [server_config['db_user'], server_config['db_pass'], server_config['db_schema']]
+      },
 			'prompt_user_before_provision' => 0,
 			'ssh_username' => 'ubuntu',
 			'os' => 'linux'

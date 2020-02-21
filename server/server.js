@@ -8,6 +8,7 @@ var enable_https = false;
 // Valid source IP Addresses that can submit new trade messages
 var whitelisted_sources = [
 '127.0.0.1',
+'10.10.10.1',
 '142.44.211.74', // Greg
 '176.248.118.201'// Me
 ];
@@ -16,14 +17,15 @@ fs.unlink(lock_file,function(){});
 
 var last_gc = 0;
 function garbage_collect() {
-  let t = (new Date()).getTime();
-  if(t - last_gc < 10000)
+  let t = Date.now();
+  if(t - last_gc < 60000)
     return; // Too soon
   if(global && global.gc)
     global.gc();
   last_gc = t;
 }
-setInterval(garbage_collect,10000);
+if(global && global.gc)
+  setInterval(garbage_collect,10000);
 
 function loadModules(cb) {
 	cb = cb || function(){};

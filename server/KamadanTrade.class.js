@@ -2,6 +2,18 @@ var live_message_log = [];
 var live_message_log_max = 100;
 const sqlite3 = require('sqlite3').verbose();
 
+Date.prototype.toStartOf = Date.prototype.toStartOf || function(unit) {
+  switch (unit) {
+    case "year": this.setMonth(0);
+    case "month": this.setDate(1);
+    case "day": this.setHours(0);
+    case "hour": this.setMinutes(0);
+    case "minute": this.setSeconds(0);
+    case "second": this.setMilliseconds(0);
+  }
+  return this;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -37,34 +49,24 @@ var KamadanTrade = {
     }
   },
   init:function() {
-    while(this.initting) {
-      sleep(100);
-    }
+    var self = this;
     if(this.initted)
       return Promise.resolve();
-    this.initted = this.initting = true;
-    var self = this;
+    if(this.initting)
+      return sleep(500).then(function() { return self.init(); });
+    this.initting = true;
+    console.log("Initialising KamadanTrade");
+    this.db = require(__dirname+'/KamadanDB.class.js');
     setInterval(function() {
       self.housekeeping();
     },30000);
-    return new Promise(function(resolve,reject) {
-      var db = new sqlite3.Database(__dirname+'/database.db', (err) => {
-        self.initting = false;
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
-        console.log('Connected to the in-memory SQlite database.');
-        db.run('CREATE TABLE IF NOT EXISTS trade_messages (h TEXT,t INTEGER,s TEXT,m TEXT)',function(err) {
-          if(err) return reject(err);
-          db.run("CREATE INDEX IF NOT EXISTS hash_idx ON trade_messages(h)",function(err) {
-            if(err) return reject(err);
-            self.db = db;
-            self.seedLiveMessageLog().then(resolve).catch(reject);
-          });
-        });
-      });
+    return this.db.init().then(function() {
+      return self.seedLiveMessageLog()
+    }).finally(function() {
+      self.initting = false;
+      self.initted = true;
+      console.log("KamadanTrade initialised");
+      return Promise.resolve();
     });
   },
   search:function(term) {
@@ -76,73 +78,49 @@ var KamadanTrade = {
       return Promise.resolve(this.live_message_log);
     console.log("Searching messages for "+term);
     return this.init().then(function() {
-      return new Promise(function(resolve,reject) {
-        // Split string by spaces
-        var keywords = term.split(' ');
-        var where_clause = "WHERE m LIKE ? ";
-        var args = ['%'+keywords[0]+'%']
-        for(var i=1;i<keywords.length;i++) {
-          where_clause += "AND m LIKE ? ";
-          args.push('%'+keywords[i]+'%');
+      // Split string by spaces
+      var keywords = term.split(' ');
+      var where_clause = " WHERE m LIKE ? ";
+      var args = ['%'+keywords[0]+'%']
+      for(var i=1;i<keywords.length;i++) {
+        where_clause += "AND m LIKE ? ";
+        args.push('%'+keywords[i]+'%');
+      }
+      var sql = "SELECT t,s,m,n FROM kamadan.trade_messages"+where_clause+"GROUP BY m,s ORDER BY t DESC LIMIT "+live_message_log_max;
+      return self.db.query(sql,args).then(function(rows) {
+        console.log(sql,args,rows);
+        for(var i in rows) {
+          rows[i].h = '' + rows[i].t + rows[i].n;
+          delete rows[i].n;
         }
-        var sql = "SELECT h,t,s,m FROM trade_messages "+where_clause+" GROUP BY m,s ORDER BY rowid DESC LIMIT "+live_message_log_max;
-        console.log(sql);
-        self.db.all(sql,args,(err, rows ) => {
-          if(err) {
-            console.error(err);
-            return reject(err);
-          }
-          return resolve(rows);
-        });
+        return Promise.resolve(rows || []);
       });
     });
   },
   addMessage:function(req) {
-    var message;
+    var recv = Date.now();
     var body = req.body || '';
     if(typeof body == 'string') {
       try {
         body = JSON.parse(body);
       } catch(e) {}
     }
-    if(!body || !body.sender || !body.message || !body.timestamp) {
-      console.error("Missing sender/message/timestamp when creating trade message");
+    var message = {
+      m:((body.m || body.message || '')+'').trim(),
+      s:((body.s || body.sender || '')+'').trim(),
+      h:recv,
+      t:Math.floor(recv / 1000)
+    }
+    if(!message.m || !message.s) {
+      console.error("Missing sender/message when creating trade message");
       console.log(body);
       return false;
     }
-    try {
-      message = {s:(req.body.sender+'').trim(),m:(req.body.message+'').trim(),t:(req.body.timestamp+'').substr(0,10)};
-    } catch(e) {
-      console.error("Failed to parse message from request");
-      console.error(e);
-      return false;
-    }
-    console.log("incoming message");
-    console.log(message);
-    // Parse timestamp
-    try {
-      var d = new Date(parseInt(message.t,10) * 1000);
-      console.log(d, d.getTime());
-      message.t = d.getTime();
-      // - Check for wrong timezone.
-      var diff_hours = Math.round((message.t - Date.now()) / 36e5);
-      if(diff_hours != 0) {
-        message.t += diff_hours * 36e5;
-        console.log("Timezone for incoming timestamp "+message.t+" adjusted by "+diff_hours+" hours to be "+message.t);
-      }
-      message.t = parseInt((message.t+'').substring(0,10),10);
-      // Fuck it, just use current unix timestamp.
-      message.t = Math.round(Date.now() / 1000);
-    } catch(e) {
-      console.error("Failed to parse timestamp "+message.t);
-      console.error(e);
-      return false;
-    }
+    console.log("Trade message received OK");
     // Parse message content
     message.m = message.m.replace(/\\(\\|\[|\])/g,'$1');
     if(!message.m.length)
       return false; // Empty message
-    message.h = message.t+String.random(3);
     // Avoid spam by the same user (or multiple trade message sources!)
     var last_user_msg = this.last_message_by_user[message.s];
     if(last_user_msg && last_user_msg.m == message.m
@@ -161,11 +139,7 @@ var KamadanTrade = {
     var self = this;
     // database message log
     this.init().then(function() {
-      // db loaded!
-      self.db.run("INSERT INTO trade_messages (h,t,s,m) values (?,?,?,?)", 
-        [message.h,message.t,message.s,message.m], function(err) {
-        if (err) return console.error(err.message);
-      });
+      return self.db.query("INSERT INTO kamadan.trade_messages (n,t,s,m) values (?,?,?,?)", [message.h.toString().slice(-3),message.t,message.s,message.m]);
     }).catch(function(err) {
       console.error(err);
       return message;
@@ -179,16 +153,14 @@ var KamadanTrade = {
       return Promise.resolve([]);
     console.log("Searching user message for "+term);
     return this.init().then(function() {
-      return new Promise(function(resolve,reject) {
-        self.db.all("SELECT h,t,s,m FROM trade_messages WHERE s LIKE ? GROUP BY m ORDER BY rowid DESC LIMIT "+live_message_log_max,[term],(err, rows ) => {
-          if(err) {
-            console.error(err);
-            return reject(err);
+      return self.db.query("SELECT n,t,s,m FROM kamadan.trade_messages WHERE s LIKE ? GROUP BY m ORDER BY t DESC LIMIT "+live_message_log_max,[term])
+        .then(function(rows) {
+          for(var i in rows) {
+            rows[i].h = '' + rows[i].t + rows[i].n;
+            delete rows[i].n;
           }
-          console.log(rows);
-          return resolve(rows);
+          return Promise.resolve(rows || []);
         });
-      });
     });
   },
   getMessagesSince:function(h) {
@@ -200,17 +172,18 @@ var KamadanTrade = {
   },
   seedLiveMessageLog:function() {
     var self = this;
-    return new Promise(function(resolve,reject) {
-      self.db.all("SELECT h,t,s,m FROM trade_messages ORDER BY rowid DESC LIMIT "+live_message_log_max,(err, rows ) => {
-        if(err) {
-          console.error(err);
-          return reject(err);
-        }
-        self.live_message_log = rows;
-        self.last_message = self.live_message_log[0];
-        console.log(self.live_message_log.length+" messages retrieved from db");
-        resolve();
-      });
+    return this.db.query("SELECT n, s, m, t\
+    FROM kamadan.trade_messages \
+    ORDER BY t desc, n desc \
+    LIMIT "+live_message_log_max).then(function(rows) {
+      for(var i in rows) {
+        rows[i].h = rows[i].t + rows[i].n + '';
+        delete rows[i].n;
+      }
+      self.live_message_log = rows;
+      self.last_message = self.live_message_log[0];
+      console.log(self.live_message_log.length+" messages retrieved from db");
+      return Promise.resolve();
     });
   }
 }

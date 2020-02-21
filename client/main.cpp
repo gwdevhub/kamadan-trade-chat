@@ -1,6 +1,7 @@
 #include "main.h"
 
-#define SERVER_HOST "18.202.80.59"
+//#define SERVER_HOST "18.202.80.59"
+#define SERVER_HOST "local.kamadan.com"
 
 struct TradeMessage {
     time_t    timestamp = 0;
