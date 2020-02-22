@@ -3,40 +3,60 @@
 var KamadanDB = require(__dirname+'/KamadanDB.class.js');
 var WebSocket = require('ws');
 const url = 'wss://kamadan.decltype.org/ws/notify/';
-const connection = new WebSocket(url);
+
 
 var offset = 0;
 var decltype_messages = [];
+var to_get=0;
+var got = [];
+var has_first = false;
+
 function getNextBatch() {
-  var req = JSON.stringify({query:'',offset:offset,suggest:false});
-  console.log("Requesting next batch "+req);
-  connection.send(req);
+  decltype_messages = [];
+  console.log("Requesting next batch, offset "+offset);
+  to_get = 1;
+  for(var i=0;i<to_get;i++) {
+    connection.send(JSON.stringify({query:'',offset:offset * (i+1),suggest:false}));
+  }
 }
 function insertMessages() {
+  console.log("writing batch");
   if(!decltype_messages.length)
     return;
-  var sql = [];
-  var args = [];
+  to_get = decltype_messages.length;
+  let args = [];
   for(var i = 0;i<decltype_messages.length;i++) {
-    sql.push('(?,?,?,?)');
-    args.push(decltype_messages[i].id);
-    args.push(decltype_messages[i].name);
-    args.push(decltype_messages[i].timestamp);
-    args.push(decltype_messages[i].message);
+    for(var j = 0;j<decltype_messages[i].length;j++) {
+      if(decltype_messages[i][j].id == 1)
+        has_first = true;
+      let a = [];
+      a.push(decltype_messages[i][j].id);
+      a.push(decltype_messages[i][j].name);
+      a.push(decltype_messages[i][j].timestamp);
+      a.push(decltype_messages[i][j].message);
+      args.push(a);
+      offset++;
+    }
   }
-  KamadanDB.query("INSERT INTO kamadan.decltype_messages (i,n,t,m) VALUES "+sql.join(','),args).then(function(res) {
-    decltype_messages = [];
-    getNextBatch();
-  }).catch(function(e) {
-    console.error(e);
-  });
+  console.log(args.length);
+  KamadanDB.batch("INSERT INTO kamadan.decltype_messages (i,n,t,m) VALUES (?,?,?,?)", args).then(function(res) {
+      console.log(res);
+      if(!has_first)
+        getNextBatch();
+    });
+  
 }
 var started = false;
+const connection = new WebSocket(url);
 connection.onopen = function(e) {
   console.log("Websocket opened OK");
   if(started) return;
   started = 1;
-  getNextBatch();
+  KamadanDB.query("SELECT COUNT(*) offset FROM kamadan.decltype_messages").then(function(res) {
+    if(res.length)
+      offset = parseInt(res[0].offset);
+    getNextBatch();
+  });
 }
 connection.onmessage = function(e) {
   console.log("Got message");
@@ -46,16 +66,9 @@ connection.onmessage = function(e) {
   } catch(e) {};
   if(data.query != '')
     return;
-  offset = parseInt(data.offset,10) + data.results.length;
-  console.log("num records = "+data.results.length);
-  for(var i=0;i<data.results.length;i++) {
-    decltype_messages.push(data.results[i]);
-  }
-  if(decltype_messages.length > 100)
-    return insertMessages();
-  getNextBatch();
+  decltype_messages.push(data.results);
+  to_get--;
+  if(to_get > 0)
+    return;
+  insertMessages();
 }
-
-setTimeout(function() {
-  console.log("total messages been got is "+decltype_messages.length+" - bye!");
-},10000);

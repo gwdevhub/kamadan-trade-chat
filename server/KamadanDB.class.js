@@ -23,6 +23,22 @@ var KamadanDB = {
       });
     });
   },
+  batch:function(query,args) {
+    var self = this;
+    
+    return this.init().then(function() {
+      console.log("KamadanDB BATCH: "+query);
+      return self.pool.getConnection().then(function(conn) {
+        return conn.batch(query, args || []).then(function(results) {
+          //console.log(results);
+          delete results['meta'];
+          return Promise.resolve(results);
+        }).finally(function() {
+          conn.end();
+        });
+      });
+    });
+  },
   seed:function() {
     var self=this;
     return Promise.all([

@@ -42,10 +42,10 @@ cmp -s "/etc/mysql/mariadb.conf.d/zz_project.cnf" "${PROJECT_CODE_FOLDER}/server
   sudo service mysql restart);
 sudo mysql -u ${DB_USER} -p${DB_PASS} -e "show processlist;" || (
   printf "${RED}*** Configuring mariadb database: setting up user ${DB_USER} ***${NC}\n";
-  sudo mysql -u root -e "FLUSH PRIVILEGES;CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"; 
+  sudo mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';"; 
   sudo mysql -u root -e "GRANT ALL PRIVILEGES ON * . * TO '${DB_USER}'@'%';FLUSH PRIVILEGES;";
   sudo service mysql restart);
-sudo mysql -u ${DB_USER} -p${DB_PASS} -e "CREATE DATABASE IF NOT EXISTS `${DB_SCHEMA}` COLLATE 'utf8mb4_general_ci';";
+sudo mysql -u ${DB_USER} -p${DB_PASS} -e "CREATE DATABASE IF NOT EXISTS ${DB_SCHEMA};";
 
 # NodeJS process:
 # 1. Install forever package if not present
