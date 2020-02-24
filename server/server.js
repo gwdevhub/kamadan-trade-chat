@@ -16,6 +16,9 @@ var whitelisted_sources = [
 var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
+// Check/renew SSL certificates daily.
+repeat_script('renew_ssl_certificates.js',864e5);
+
 var cached_message_log = "[]";
 var wssl;
 var wss;

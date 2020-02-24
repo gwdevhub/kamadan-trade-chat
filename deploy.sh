@@ -27,7 +27,7 @@ else
 fi
 printf "${RED}*** Connected ssh client is ${SSH_IP} ***${NC}\n";
 
-REQUIRED_PACKAGES='apt-transport-https build-essential curl chrony mariadb-server software-properties-common tesseract-ocr tor nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1'
+REQUIRED_PACKAGES='apt-transport-https build-essential curl chrony mariadb-server software-properties-common tesseract-ocr tor nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1 certbot'
 
 sudo ln -sf /usr/share/zoneinfo/${SERVER_TIMEZONE} /etc/localtime; 
 export NODE_ENV=production; 
@@ -39,6 +39,7 @@ export NODE_ENV=production;
 
 sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
   printf "${RED}*** Installing missing packages via apt-get ***${NC}\n";
+  sudo add-apt-repository ppa:certbot/certbot;
   sudo apt-get update && sudo apt-get install -y apt-transport-https build-essential curl;
   sudo curl -sL https://deb.nodesource.com/setup_12.x | sudo bash -;
   sudo apt-get install -y ${REQUIRED_PACKAGES});

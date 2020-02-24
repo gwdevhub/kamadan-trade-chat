@@ -1,6 +1,6 @@
 var KamadanClient = {
   poll_interval:3000,
-  ws_interval:20000,
+  ws_interval:60000,
   debug:/local/.test(window.location.hostname),
   log:function() {
     if(!this.debug) return;
@@ -92,9 +92,9 @@ var KamadanClient = {
     this.table_wrapper = this.current_wrapper.parentElement;
     this.search_input = document.getElementById('search-input');
     this.footer = document.getElementById('footer');
-    this.websocket_url = "ws://"+window.location.hostname+":80";
+    this.websocket_url = "ws://"+window.location.hostname;
     if(window.location.protocol == 'https:') {
-      this.websocket_url = "wss://"+window.location.hostname+":443";
+      this.websocket_url = "wss://"+window.location.hostname;
     }
     var self = this;
     document.getElementById('home-link').addEventListener('click',function(e) {
@@ -166,6 +166,7 @@ var KamadanClient = {
       this.ws.onerror = function(evt) {
         self.error("Websocket error",evt);
         self.setPollInterval(3000);
+        self.setWebsocketInterval(self.ws_interval + 3000);
       }
       this.ws.onmessage = function(evt) {
         self.setPollInterval(30000);
@@ -181,6 +182,7 @@ var KamadanClient = {
     } catch(e) {
       self.error("Websocket error exception",e);
       self.setPollInterval(3000);
+      self.setWebsocketInterval(self.ws_interval + 3000);
     }
   },
   last_drawn_hash:'',
