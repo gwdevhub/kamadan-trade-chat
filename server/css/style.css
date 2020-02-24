@@ -20,6 +20,16 @@ img{
 table,tbody{
     border:0
 }
+#listings table {
+  height:4500px;
+  margin-bottom:120px;
+  border:1px solid #ccc;
+  border-top:0;
+  border-bottom:0;
+}
+#listings table.display-search {
+  height:auto;
+}
 button::-moz-focus-inner{
     border:0
 }
@@ -51,7 +61,7 @@ button:active{
 }
 .center-row{
     width:100%;
-    margin:auto
+    margin:0 auto;
 }
 #search-form{
     display:inline-flex;
@@ -199,9 +209,6 @@ button:active{
     flex-direction:column;
     z-index:0;
     overflow:hidden;
-    border:1px solid #ccc;
-    border-top:0;
-    border-bottom:0;
     position:relative
 }
 #results-header{
@@ -294,7 +301,7 @@ table,tbody {
     display:flex;
     flex-direction:column;
     justify-content:center;
-    padding:5px;
+    padding-left:5px;
     word-wrap:break-word
 }
 .delete{
@@ -363,7 +370,11 @@ table,tbody {
     border-top:1px solid #eee;
     background-color:#fafafa;
     margin-top:20px;
-    padding:10px 10px 20px 10px
+    padding:10px 10px 20px 10px;
+    position:absolute;
+    bottom:0;
+    left:0;
+    width:100%;
 }
 #disclaimer{
     display:block;

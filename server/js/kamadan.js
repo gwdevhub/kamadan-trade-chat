@@ -7,7 +7,7 @@ var KamadanClient = {
     console.log.apply(console,arguments);
   },
   error:function() {
-    if(!this.debug) return;
+    //if(!this.debug) return;
     console.error.apply(console,arguments);
   },
   max_messages:100,
@@ -18,13 +18,20 @@ var KamadanClient = {
   getSearchTerm:function() {
     return (this.search_input.value+'').trim();
   },
-  search:function(term) {
+  loadMore:function() {
+    if(this.current_display != 'search' || !this.search_results.length || this.searching)
+      return;
+    var earliest_msg = this.search_results[this.search_results.length - 1];
+    if(this.last_searched_offset == earliest_msg.t)
+      return; // Reached end of results
+    this.search(this.last_search_term,earliest_msg.t);
+  },
+  search:function(term,offset) {
     if(term)
       this.search_input.value = term;
     var term = this.getSearchTerm();
-    // - 3000ms wait time between same searches
-    if(term == this.last_search_term && this.last_search_date + 3000 > Date.now())
-      return;
+    offset = offset || 0;
+    this.last_searched_offset = offset;
     this.last_search_term = term;
     this.last_search_date = Date.now();
     var endpoint = '/s/';
@@ -34,20 +41,37 @@ var KamadanClient = {
     }
     if(!term.length)
       return;
+    if(this.searching)
+      return;
+    this.searching = 1;
+    this.last_searched_term = term;
+    this.last_searched_offset = offset
+    if(offset == 0) {
+      this.search_results = [];
+      this.clearMessages();
+    }
     var self = this;
     var req = new XMLHttpRequest();
+    document.getElementById('search-info').innerHTML = "Searching for <i>"+term+"</i>...";
     req.addEventListener("load", function() {
-      if(!this.response.length) return;
-      var result;
+      var result = [];
       try {
-        result = JSON.parse(this.response);
+        if(this.response.length)
+          result = JSON.parse(this.response);
       } catch(e) {
         self.error(e);
-        return;
       }
+      self.search_input.value = self.last_search_term;
       self.parseSearchResults(result);
+      self.searching = 0;
     });
-    req.open("GET", endpoint+encodeURIComponent(term));
+    req.addEventListener("error",function() {
+      console.error(arguments);
+      self.search_input.value = self.last_search_term;
+      self.parseSearchResults([]);
+      self.searching = 0;
+    });
+    req.open("GET", endpoint+encodeURIComponent(term)+'/0/'+offset);
     req.send();
   },
   setPollInterval:function(ms) {
@@ -63,7 +87,11 @@ var KamadanClient = {
   },
   init:function() {
     this.current_wrapper = document.getElementById('current-wrapper');
+    this.page_wrapper = document.getElementById('page');
+    this.results_header = document.getElementById('results-header');
+    this.table_wrapper = this.current_wrapper.parentElement;
     this.search_input = document.getElementById('search-input');
+    this.footer = document.getElementById('footer');
     this.websocket_url = "ws://"+window.location.hostname+":80";
     if(window.location.protocol == 'https:') {
       this.websocket_url = "wss://"+window.location.hostname+":443";
@@ -72,11 +100,20 @@ var KamadanClient = {
     document.getElementById('home-link').addEventListener('click',function(e) {
       e.preventDefault();
       self.search_input.value = '';
-      self.redrawMessages(true);
+      window.scrollTo(0,0);
+      self.redrawMessages();
     });
     this.loadMessages();
     window.addEventListener("beforeunload", function(event) {
       self.saveMessages(true);
+    });
+    window.addEventListener('scroll', function(e) {
+      if(self.current_display != 'search' || !self.search_results.length || self.searching)
+        return;
+      
+      if(window.scrollY + window.innerHeight > self.footer.offsetTop) {
+        self.loadMore();
+      }
     });
     document.getElementById('search-form').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -87,9 +124,6 @@ var KamadanClient = {
         clearTimeout(self.search_timer);
       if(!(self.search_input.value+'').trim().length)
         return self.redrawMessages(true);
-      self.search_timer = setTimeout(function() {
-        self.search();
-      },250);
     };
     //this.search_input.addEventListener('keyup',onchange);
     this.search_input.addEventListener('change',onchange);
@@ -122,61 +156,74 @@ var KamadanClient = {
       }
     }
     var self=this;
-    this.ws = new WebSocket(this.websocket_url);
-    this.ws.onopen = function(evt) {
-      self.log("Websocket opened");
-      self.setPollInterval(30000);
-      self.poll(true);
-    }
-    this.ws.onerror = function(evt) {
-      self.error("Websocket error",evt);
+    try {
+      this.ws = new WebSocket(this.websocket_url);
+      this.ws.onopen = function(evt) {
+        self.log("Websocket opened");
+        self.setPollInterval(30000);
+        self.poll(true);
+      }
+      this.ws.onerror = function(evt) {
+        self.error("Websocket error",evt);
+        self.setPollInterval(3000);
+      }
+      this.ws.onmessage = function(evt) {
+        self.setPollInterval(30000);
+        try {
+          var data = JSON.parse(evt.data);
+          if(data && data.h)
+            self.parseMessages([data]);
+        }
+        catch(e) {
+          self.error(e);        
+        }
+      };
+    } catch(e) {
+      self.error("Websocket error exception",e);
       self.setPollInterval(3000);
     }
-    this.ws.onmessage = function(evt) {
-      self.setPollInterval(30000);
-      try {
-        var data = JSON.parse(evt.data);
-        if(data && data.h)
-          self.parseMessages([data]);
-      }
-      catch(e) {
-        self.error(e);        
-      }
-    };
   },
   last_drawn_hash:'',
-  redrawMessages:function(flush = false) {
+  clearMessages:function() {
+    this.current_wrapper.innerHTML = '';
+  },
+  redrawMessages:function() {
     var html = '';
     if(!this.getSearchTerm().length) {
       document.getElementById('search-info').innerHTML = '';
     }
     var to_add = [];
     var messages = this.messages;
-    if((this.search_input.value+'').trim().length) {
-      if(!flush) return;
+    var current_display = 'live';
+
+    if(this.getSearchTerm().length) {
       messages = this.search_results;
-      clear = true;
-      html = '';
+      current_display = 'search';
     }
+    if(current_display != this.current_display)
+      this.clearMessages();
     for(var i = 0;i < messages.length ;i++) {
-      if(!flush && document.getElementById('t-'+messages[i].h))
-        break;
+      if(document.getElementById(messages[i].t))
+        continue;
       to_add.push(i);
     }
     for(var i = to_add.length - 1;i >= 0 ;i--) {
-      html = '<tr class="row unanimated" id="t-'+messages[i].h+'">\
-        <td class="info"><div class="name">'+messages[i].s+'</div><div data-timestamp="'+messages[i].t.getTime()+'" class="age"></div></td>\
-        <td class="message">'+messages[i].m+'</td>\
+      html = '<tr class="row unanimated" id="'+messages[to_add[i]].t+'">\
+        <td class="info"><div class="name">'+messages[to_add[i]].s+'</div><div data-timestamp="'+messages[to_add[i]].t+'" class="age"></div></td>\
+        <td class="message">'+messages[to_add[i]].m+'</td>\
       </tr>' + html;
     }
     // Use document fragment to prepend if available.
-    if(flush) {
-      window.scrollTo(0,0);
-      this.current_wrapper.innerHTML = html;
-    } else {
+    if(current_display == 'live' && this.current_wrapper.firstChild) {
       this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
-      this.checkAndNotify(to_add);
+    } else {
+      this.current_wrapper.append(HTML2DocumentFragment(html));
     }
+    if(current_display == 'live')
+        this.checkAndNotify(to_add);
+    this.current_display = current_display;
+    this.page_wrapper.className = 'display-'+current_display;
+    this.table_wrapper.className = 'display-'+current_display;
     this.timestamps();
     this.animations();
   },
@@ -231,9 +278,6 @@ var KamadanClient = {
     this.messages = this.messages || [];
     var has_new = false;
     for(var i=json.length-1; i >= 0;i--) {
-      //if(json[i].h == latest_message.h)
-      //  continue;
-      json[i].t = new Date(json[i].t * 1000);
       has_new = this.messages.unshift(json[i]);
     }
     while(this.messages.length > this.max_messages) {
@@ -245,16 +289,13 @@ var KamadanClient = {
     }
   },
   loadMessages:function() {
-    if(!window.localStorage) return;
+    if(!window.localStorage || true) return;
     this.messages = [];
     try {
       this.messages = JSON.parse(window.localStorage.getItem('messages'))
     } catch(e) {    };
     if(!this.messages || !this.messages.length)
       return;
-    for(var i in this.messages) {
-      this.messages[i].t = new Date(this.messages[i].t);
-    }
     this.redrawMessages();
   },
   saveMessages:function(force = false) {
@@ -270,16 +311,21 @@ var KamadanClient = {
     this.pendingSave = setTimeout(doSave,5000);
   },
   parseSearchResults:function(json) {
-    var latest_message = (this.getLastMessage() || {'h':''});
-    this.search_results = [];
-    var has_new = false;
-    for(var i=json.length-1; i >= 0;i--) {
-      json[i].t = new Date(json[i].t * 1000);
-      has_new = this.search_results.unshift(json[i]);
+    if(this.search_results.length) {
+      for(var i=0; i < json.length;i++) {
+        this.search_results.push(json[i]);
+      }
+    } else {
+      for(var i=json.length - 1; i >= 0;i--) {
+        this.search_results.unshift(json[i]);
+      }
     }
-    
+    if(this.search_results.length && this.search_results.length < 100) {
+      // No more messages to get; manually set last search offset to avoid polling again
+      this.last_searched_offset = this.search_results[this.search_results.length - 1].t;
+    }
     this.redrawMessages(true);
-    document.getElementById('search-info').innerHTML = this.search_results.length+" results found for <i>"+(this.search_input.value+'').trim()+"</i>";
+    document.getElementById('search-info').innerHTML = "Showing "+this.search_results.length+" results for <i>"+this.getSearchTerm()+"</i>";
   },
   poll:function(force) {
     var self = this;
@@ -326,12 +372,9 @@ function getFavicon(){
   if(favicon)
     return favicon;
   var nodeList = document.getElementsByTagName("link");
-  for (var i = 0; i < nodeList.length; i++)
-  {
-      if((nodeList[i].getAttribute("rel") == "icon")||(nodeList[i].getAttribute("rel") == "shortcut icon"))
-      {
-          favicon = nodeList[i].getAttribute("href");
-      }
+  for (var i = 0; !favicon && i < nodeList.length; i++) {
+    if((nodeList[i].getAttribute("rel") == "icon")||(nodeList[i].getAttribute("rel") == "shortcut icon"))
+      favicon = nodeList[i].getAttribute("href");
   }
   return favicon;        
 }

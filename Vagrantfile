@@ -1,10 +1,3 @@
-# NOTES:
-# https://github.com/bdwyertech/vagrant-aws works on windows?
-#
-#
-#
-#
-#
 ENV["VAGRANT_DISABLE_RESOLV_REPLACE"] = "1"
 ENV["VAGRANT_DETECTED_OS"] = ENV["VAGRANT_DETECTED_OS"].to_s + " cygwin" if RUBY_PLATFORM.include? "mingw"		# Fix folder structure for Cygwin installations
 ENV["VAGRANT_DEFAULT_PROVIDER"] = "virtualbox"		# Use VirtualBox by default.
@@ -53,14 +46,8 @@ Debian8_Official_amd64 = {
 
 VirtualBox = Ubuntu18_Official_amd64
 
-# ------------------ 	Chef JSON Definitions		 ------------------
-# Anything in the "environment_variables" array will be defined in /server/environment_variables.inc.php by Chef
-# i.e. chef_json['environment_variables']['is_cloud'] = 1 would be defined as IS_CLOUD = '1' in PHP.
-#
-# The Eevee cookbook also references these variables to decide which recipes to run (e.g. if 'is_rackspace' == 1, runs eevee-server::eevee-rackspace)
-#
-# eevee-server::eevee-mysql will attempt to create/seed the schemas in the 'databases' array. 
-# If 'host' == '127.0.0.1', eevee will create a new MySQL 5.6 server on the guest machine.
+# ------------------    Definitions		 ------------------
+require "#{File.dirname(__FILE__)}/.env.rb"
 
 server_config = {
 	'is_local'=>0,
@@ -76,7 +63,10 @@ server_config = {
   'db_user'=>'nodejs',
   'db_host'=>'127.0.0.1',
   'db_schema'=>'kamadan',
-  'db_pass'=>'K4maDan1423!'
+  'db_pass'=>ENV["DB_PASS"] || '',
+  'google_drive_backups_folder_id' => ENV["google_drive_backups_folder_id"],
+  'google_apis_private_key' => ENV["google_apis_private_key"],
+  'google_apis_client_email' => ENV["google_apis_client_email"]
 }
 
 local_config = Marshal::load(Marshal.dump(server_config))

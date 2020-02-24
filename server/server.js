@@ -2,6 +2,7 @@ console.log("Initializing node server...");
 process.env.NODE_PATH = "../node_modules";
 require("module").Module._initPaths();
 var fs = fs || require('fs');
+eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
 var enable_https = false;
 
@@ -15,40 +16,9 @@ var whitelisted_sources = [
 var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
-var last_gc = 0;
-function garbage_collect() {
-  let t = Date.now();
-  if(t - last_gc < 60000)
-    return; // Too soon
-  if(global && global.gc)
-    global.gc();
-  last_gc = t;
-}
-if(global && global.gc)
-  setInterval(garbage_collect,10000);
-
-function loadModules(cb) {
-	cb = cb || function(){};
-	console.log("\n---------- Loading Modules via require() ----------\n");
-	eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
-	console.log("\n--------------------------------\n");
-	return cb.apply(this);
-}
-function loadHelperFunctions(cb) {
-	cb = cb || function(){};
-	console.log("\n---------- Loading Helper Functions/Classes ----------\n");
-	var helper_functions = [
-		__dirname+'/String.class.js'
-	]
-	for(var i in helper_functions)
-		console.log(helper_functions[i]), eval(fs.readFileSync(helper_functions[i])+'');
-	console.log("\n--------------------------------\n");
-	return cb.apply(this);
-}
 var cached_message_log = "[]";
 function init(cb) {
   KamadanTrade.init().then(function() {
-    console.log("got log");
     cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
   });
 	cb = cb || function(){}
@@ -128,41 +98,46 @@ function init(cb) {
       lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
         if(err) console.error(err);
         // Don't drop out on error; we'll unlock the stale file later
-        try {
-          var added_message = KamadanTrade.addMessage(req);
+        KamadanTrade.addMessage(req).then(function(added_message) {
           if(!added_message)
-            return lockFile.unlock(lock_file); // Error adding message
-          added_message = JSON.stringify(added_message);
-          if(added_message.length) {
-            wss.clients.forEach(function each(client) {
-              client.send(added_message);
-            });
-            if(wssl) {
-              wssl.clients.forEach(function each(client) {
+            return; // Error adding message
+          try {
+            added_message = JSON.stringify(added_message);
+            if(added_message.length) {
+              wss.clients.forEach(function each(client) {
                 client.send(added_message);
               });
+              if(wssl) {
+                wssl.clients.forEach(function each(client) {
+                  client.send(added_message);
+                });
+              }
             }
+            cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+          } catch(e) {
+            console.error(e);
           }
-        } catch(e) { 
+        }).catch(function(e) {
           console.error(e);
-        }
-        cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
-        return lockFile.unlock(lock_file);
+        }).finally(function() {
+          lockFile.unlock(lock_file);
+        });
       });
     });
     app.get('/', function(req,res) {
       res.sendFile(__dirname+'/index.html');
     });
-    app.get('/s/:term', function(req,res) {
-      KamadanTrade.search(req.params.term || req.query.term).then(function(rows) {
+    app.get('/s/:term/:from?/:to?', function(req,res) {
+      KamadanTrade.search(req.params.term,req.params.from,req.params.to).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {
         console.error(e);
         res.json([]);
       });
     });
-    app.get('/u/:user', function(req,res) {
-      KamadanTrade.getMessagesByUser(req.params.user || req.query.user).then(function(rows) {
+    app.get('/u/:term/:from?/:to?', function(req,res) {
+      var user = ((req.params.term || req.query.term)+'').replace(/^user:/,'');
+      KamadanTrade.search('user:'+user,req.params.from,req.params.to).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {
         console.error(e);
@@ -174,10 +149,10 @@ function init(cb) {
       // 304 if no new messages
       if(!KamadanTrade.last_message)
         return res.status(304).end();
-      if(etag == KamadanTrade.last_message.h)
+      if(etag == KamadanTrade.last_message.t)
         return res.status(304).end();
       //console.log(KamadanTrade.last_message);
-      res.setHeader('ETag', KamadanTrade.last_message.h);
+      res.setHeader('ETag', KamadanTrade.last_message.t);
       
       // Return messages since last hash
       if(etag != 'none') {
@@ -210,7 +185,7 @@ function init(cb) {
           return ws.send(JSON.stringify({since:obj.since, num_results:rows.length,results:rows}));
         }
         if(typeof obj.query != 'undefined') {
-          return KamadanTrade.search(obj.query).then(function(rows) {
+          return KamadanTrade.search(obj.query,obj.from || 0, obj.to || 0).then(function(rows) {
             ws.send(JSON.stringify({query:obj.query, num_results:rows.length,results:rows}));
           }).catch(function(e) {
             console.error(e);
@@ -250,6 +225,6 @@ function init(cb) {
 	console.log("\n--------------------------------\n");
 	cb.apply(this);
 }
-loadModules();
-loadHelperFunctions();
-init();
+preload().then(function() {
+  init();
+});

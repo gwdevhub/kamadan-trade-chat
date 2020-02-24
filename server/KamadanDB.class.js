@@ -13,8 +13,12 @@ var KamadanDB = {
     //console.log("KamadanDB QUERY: "+query);
     return this.init().then(function() {
       return self.pool.getConnection().then(function(conn) {
+        var start = Date.now();
         return conn.query(query, args || []).then(function(results) {
-          //console.log(results);
+          var duration = (Date.now() - start);
+          if(duration > 30) {
+            console.log("SLOW QUERY: "+query+"\nDuration: "+duration+"ms");
+          }
           delete results['meta'];
           return Promise.resolve(results);
         }).finally(function() {
@@ -27,7 +31,7 @@ var KamadanDB = {
     var self = this;
     
     return this.init().then(function() {
-      console.log("KamadanDB BATCH: "+query);
+      //console.log("KamadanDB BATCH: "+query);
       return self.pool.getConnection().then(function(conn) {
         return conn.batch(query, args || []).then(function(results) {
           //console.log(results);
@@ -41,18 +45,7 @@ var KamadanDB = {
   },
   seed:function() {
     var self=this;
-    return Promise.all([
-      self.query("CREATE TABLE IF NOT EXISTS kamadan.trade_messages (\
-        t INT(10) UNSIGNED NOT NULL COMMENT 'Unix timestamp',\
-        n SMALLINT(5) UNSIGNED NOT NULL COMMENT 'Milliseconds',\
-        s VARCHAR(100) NULL DEFAULT NULL COMMENT 'Sender',\
-        m VARCHAR(255) NULL DEFAULT NULL COMMENT 'Message',\
-        PRIMARY KEY (t, n),\
-        FULLTEXT INDEX m (m)\
-      )\
-      COLLATE='utf8mb4_general_ci'\
-      ENGINE=InnoDB;")
-    ]);
+    return Promise.resolve();
   },
   init:function() {
     var self = this;
