@@ -171,7 +171,7 @@ var KamadanClient = {
         self.setPollInterval(30000);
         try {
           var data = JSON.parse(evt.data);
-          if(data && data.h)
+          if(data && data.t && data.m || data.s)
             self.parseMessages([data]);
         }
         catch(e) {
