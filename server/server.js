@@ -17,14 +17,15 @@ var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
 var cached_message_log = "[]";
+var wssl;
+var wss;
 function init(cb) {
   KamadanTrade.init().then(function() {
     cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
   });
 	cb = cb || function(){}
 	console.log("\n---------- Starting Web Server ----------\n");
-  var wssl;
-  var wss;
+
 	function configureWebServer(app) {
     'use strict';
 		if(!app)	app = express();
@@ -99,19 +100,25 @@ function init(cb) {
         if(err) console.error(err);
         // Don't drop out on error; we'll unlock the stale file later
         KamadanTrade.addMessage(req).then(function(added_message) {
-          if(!added_message)
+          if(!added_message) {
+            console.log("No added message?");
             return; // Error adding message
+          }
           try {
             added_message = JSON.stringify(added_message);
             if(added_message.length) {
+              var sent_to = 0;
               wss.clients.forEach(function each(client) {
                 client.send(added_message);
+                sent_to++;
               });
               if(wssl) {
                 wssl.clients.forEach(function each(client) {
                   client.send(added_message);
+                  sent_to++;
                 });
               }
+              console.log("Sent to "+sent_to+" connected sockets");
             }
             cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
           } catch(e) {
@@ -165,11 +172,11 @@ function init(cb) {
 		return app;
 	}
   function configureWebsocketServer(server) {
-    var wss = new WebSocketServer({
+    var websrvr = new WebSocketServer({
       server: server
     });
     
-    wss.on('connection', function(ws) {
+    websrvr.on('connection', function(ws) {
       ws.on('message', function(message) {
         if(!message.length) return;
         var obj;
@@ -194,7 +201,7 @@ function init(cb) {
         }
       });
     });
-    return wss;
+    return websrvr;
   }
 	
   // - Do the listening

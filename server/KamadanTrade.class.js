@@ -198,24 +198,27 @@ var KamadanTrade = {
     }
     var self = this;
     // database message log
-    return this.init().then(function() {
-      var year = (new Date()).getUTCFullYear();
-      // If this user has advertised this message in the last hour, just update it.
-      self.db.query("UPDATE kamadan_"+year+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - 36e5]).then(function(res) {
-        var done = function() {
-          self.last_message_by_user[message.s] = message;
-          // live message log
-          self.live_message_log.unshift(message);
-          while(self.live_message_log.length > live_message_log_max) {
-            self.live_message_log.pop();
-          }
-          self.last_message = message;
-          return Promise.resolve(message);
-        };
-        if(res.affectedRows)
-          return done();
-        return self.db.query("INSERT INTO kamadan.kamadan_"+year+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]).then(function(res) {
-          return done();
+    return new Promise(function(resolve,reject) {
+      self.init().then(function() {
+        var year = (new Date()).getUTCFullYear();
+        // If this user has advertised this message in the last hour, just update it.
+        return self.db.query("UPDATE kamadan_"+year+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - 36e5]).then(function(res) {
+          var done = function() {
+            self.last_message_by_user[message.s] = message;
+            // live message log
+            self.live_message_log.unshift(message);
+            while(self.live_message_log.length > live_message_log_max) {
+              self.live_message_log.pop();
+            }
+            self.last_message = message;
+            console.log("Message added ok");
+            return resolve(message);
+          };
+          if(res.affectedRows)
+            return done();
+          return self.db.query("INSERT INTO kamadan.kamadan_"+year+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]).then(function(res) {
+            return done();
+          });
         });
       });
     });
