@@ -201,7 +201,7 @@ var KamadanTrade = {
     return this.init().then(function() {
       var year = (new Date()).getUTCFullYear();
       // If this user has advertised this message in the last hour, just update it.
-      self.db.query("UPDATE kamadan_"+year+" SET t > ? WHERE s = ? AND m = ?", [message.t - 36e5,message.s,message.m]).then(function(res) {
+      self.db.query("UPDATE kamadan_"+year+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - 36e5]).then(function(res) {
         var done = function() {
           self.last_message_by_user[message.s] = message;
           // live message log
