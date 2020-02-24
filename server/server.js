@@ -4,7 +4,7 @@ require("module").Module._initPaths();
 var fs = fs || require('fs');
 eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
-var enable_https = false;
+var ssl = { enabled:false };
 
 // Valid source IP Addresses that can submit new trade messages
 var whitelisted_sources = [
@@ -16,18 +16,18 @@ var whitelisted_sources = [
 var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
-// Check/renew SSL certificates daily.
-repeat_script('renew_ssl_certificates.js',864e5);
-
 var cached_message_log = "[]";
-var wssl;
-var wss;
 var render_cache = {};
 function renderFile(file) {
   if(ServerConfig.isLocal() || !render_cache[file])
     render_cache[file] = Mustache.render(fs.readFileSync(__dirname+'/index.html')+'',global);
   return render_cache[file];
 }
+
+var http_server;
+var https_server;
+var ws_server;
+var wss_server;
 
 function init(cb) {
   KamadanTrade.init().then(function() {
@@ -42,6 +42,16 @@ function init(cb) {
 		var limit_bytes = 1024*1024*1;	// 1 MB limit.
     if(ServerConfig.isLocal())
       app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
+
+    app.get('*',function(request, response,next){
+      if(!request.secure && ssl.enabled){
+        console.log("redirected to https");
+        response.writeHead(301, { "Location": "https://" + request.headers.host + request.url });
+        response.end();
+        return;
+      }
+      next();
+    });
 		//app.use(cookieParser());		// Used for parsing cookies (i.e. user tokens)
 		// Set upper limits for request body via POST
     app.use(bodyParser.text({limit: limit_bytes, extended: true, parameterLimit:50000}));
@@ -118,12 +128,14 @@ function init(cb) {
             added_message = JSON.stringify(added_message);
             if(added_message.length) {
               var sent_to = 0;
-              wss.clients.forEach(function each(client) {
-                client.send(added_message);
-                sent_to++;
-              });
-              if(wssl) {
-                wssl.clients.forEach(function each(client) {
+              if(ws_server) {
+                ws_server.clients.forEach(function each(client) {
+                  client.send(added_message);
+                  sent_to++;
+                });
+              }
+              if(wss_server) {
+                wss_server.clients.forEach(function each(client) {
                   client.send(added_message);
                   sent_to++;
                 });
@@ -179,6 +191,8 @@ function init(cb) {
       res.setHeader('content-type', 'application/json; charset=utf-8');
       return res.send(cached_message_log);
     });
+    
+    
 		return app;
 	}
   function configureWebsocketServer(server) {
@@ -214,34 +228,62 @@ function init(cb) {
     return websrvr;
   }
 	
-  // - Do the listening
-  var http_server = require('http').createServer();
+  
+  // Try to Gather SSL Certificate stuff
+  var ssl_domain = 'kamadan.gwtoolbox.com';
+  
+  try {
+    ssl.key = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domain+'/privkey.pem','utf8');
+    ssl.cert = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domain+'/cert.pem','utf8');
+    ssl.ca = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domain+'/chain.pem','utf8');
+    ssl.enabled = true;
+  } catch(e) {
+    console.error("There was a problem getting SSL keys for "+ssl_domain+".\n This could be because the server is local");
+  }
   var app = configureWebServer();
-  wss = configureWebsocketServer(http_server);
-  http_server.on('request', app);
-  http_server.listen(80, function() {
-    console.log("http/ws server listening on port 80");
-  });
-  if(enable_https) {
+  if(ssl.enabled) {
     try {
-      var https_server = https.createServer({
-        key: fs.readFileSync(__dirname+'/key.pem'),
-        cert: fs.readFileSync(__dirname+'/cert.pem'),
-        passphrase: 'kamadan'
+      if(https_server) {
+        https_server.close();
+        https_server = null;
+      }
+      https_server = https.createServer({
+        key: ssl.key,
+        cert: ssl.cert,
+        ca: ssl.ca
       });
-      wssl = configureWebsocketServer(https_server);
+      wss_server = configureWebsocketServer(https_server);
       https_server.on('request', app);
       https_server.listen(443, function() {
         console.log("https/wss server listening on port 443");
       });
-      
+      // Load a HTTP server, but only set up for redirection to https
+      if(http_server) {
+        http_server.close();
+        http_server = null;
+      }
     } catch(e) {
+      ssl.enabled = false;
       console.error(e);
     }
   }
+  // Fallback to normal http
+  // - Do the listening
+  if(http_server) {
+    http_server.close();
+    http_server = null;
+  }
+  http_server = require('http').createServer();
+  ws_server = configureWebsocketServer(http_server);
+  http_server.on('request', app);
+  http_server.listen(80, function() {
+    console.log("http/ws server listening on port 80");
+  });
 	console.log("\n--------------------------------\n");
 	cb.apply(this);
 }
 preload().then(function() {
+  // Check/renew SSL certificates daily.
+  repeat_script('renew_ssl_certificates.js',864e5);
   init();
 });

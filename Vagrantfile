@@ -98,7 +98,7 @@ Machines = {
   'ManagedServers' => {
 		'staging' => {
 			'ip_address' => '18.202.80.59',
-			'server_config' => local_config.merge({
+			'server_config' => cloud_config.merge({
 				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
         'is_cloud'=>1
 			}),

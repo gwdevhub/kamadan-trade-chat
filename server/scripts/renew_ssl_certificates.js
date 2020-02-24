@@ -27,27 +27,16 @@ log("Script Started");
 //---------------------------------
 if(ServerConfig.isLocal())
   return Promise.reject("Server is local - not going to mess with SSL certificates");
+
+
 return new Promise(function(resolve,reject) {
-  const { spawn } = require('child_process');
-  var stderr=[];
-  var stdout=[];
+  const { exec } = require('child_process');
   var dirname = __dirname
   log("Renewing certificate...");
-  const proc = spawn('sudo certbot certonly --webroot -w '+__dirname+' -d kamadan.gwtoolbox.com -n --agree-tos --email jon@3vcloud.uk\
-  && sudo cp -ura /etc/letsencrypt/live/ '+__dirname+'/ssl/\
-  && sudo chmod -R 755 '+__dirname+'/ssl/');
-  
-  proc.stdout.on('data', (data) => {
-    stdout.push(data);
-  });
-
-  proc.stderr.on('data', (data) => {
-    stderr.push(data);
-  });
-
-  proc.on('close', (code) => {
-    if(code != 0)
-      return reject(stderr.slice(-3).join('\n'));
-    return resolve(stdout.slice(-10).join('\n'));
+  exec('certbot certonly --webroot -w '+__dirname+' -d kamadan.gwtoolbox.com -n --agree-tos --email jon@3vcloud.uk\
+    && chmod -R 755 /etc/letsencrypt/', (err, stdout, stderr) => {
+    if(err)
+      return reject(stderr.split('\n').slice(-3).join('\n'));
+    return resolve(stdout.split('\n').slice(-10).join('\n'));
   });
 });

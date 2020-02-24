@@ -8,7 +8,7 @@ lockFile = require('lockfile');
 https = require('https');
 Mustache = require('mustache');
 
-serverScripts = {};
+global.serverScripts = {};
 
 var last_gc = 0;
 function garbage_collect() {
@@ -51,35 +51,44 @@ function preload() {
 		if(!func_name)
 			continue;
 		try {
-			eval("serverScripts."+func_name[1]+' = function(){\n'+fs.readFileSync(__dirname+'/scripts/'+script_files[i])+'\n}');
+			eval("global.serverScripts."+func_name[1]+' = function(){\n'+fs.readFileSync(__dirname+'/scripts/'+script_files[i])+'\n}');
 		} catch(e) {
 			console.error("Failed to initialise script: "+func_name);
 			console.error(e);
 		}
 	}
 	console.log("Scripts Loaded:");
-	for(var i in serverScripts) console.log("serverScripts."+i+" = "+(typeof serverScripts[i]));
+	for(var i in global.serverScripts) console.log("  serverScripts."+i+" = "+(typeof global.serverScripts[i]));
   
   return Promise.resolve();
 }
 
 function run_script(script) {
   return new Promise(function(resolve,reject) {
-    if(!serverScripts[script])
-      return Promise.reject("No valid script "+script);
-    return serverScripts[script].apply(serverScripts);
+    script = script.replace(/\..+$/,'').trim();
+    if(!global.serverScripts[script]) {
+      for(var i in global.serverScripts) console.log("  serverScripts."+i+" = "+(typeof global.serverScripts[i]));
+      reject("No valid script "+script);
+    }
+    return global.serverScripts[script].apply(serverScripts).catch(function(err) {
+      reject(err);
+    });
+  }).catch(function(err) {
+    console.error("ERROR: "+err);
   });
 }
 var periodicScripts = {};
 function repeat_script(script,interval) {
-  if(periodicScripts[script])
-    return;
-  periodicScripts[script] = interval;
+  if(periodicScripts[script] && periodicScripts[script].interval < interval)
+    return; // Already queued
+  if(periodicScripts[script] && periodicScripts[script].timeout)
+    clearTimeout(periodicScripts[script].timeout);
+  periodicScripts[script] = {interval:interval,timeout:null};
   run_script(script).catch(function(e) {
     console.error("repeat_every_day for "+script+" failed!");
     console.error(e);
   }).finally(function() {
     console.log("repeat_every_hour for "+script+" finished, reqeueing...");
-    setTimeout(function() { repeat_script(script,repeat_script) },interval);
+    periodicScripts[script].timeout = setTimeout(function() { repeat_script(script,repeat_script) },interval);
   });
 }
