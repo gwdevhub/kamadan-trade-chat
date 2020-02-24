@@ -171,7 +171,7 @@ var KamadanClient = {
         self.setPollInterval(30000);
         try {
           var data = JSON.parse(evt.data);
-          if(data && data.t && data.m || data.s)
+          if(data && data.t && data.m && data.s)
             self.parseMessages([data]);
         }
         catch(e) {
@@ -289,9 +289,13 @@ var KamadanClient = {
     }
   },
   loadMessages:function() {
-    if(!window.localStorage || true) return;
+    if(!window.localStorage) 
+      return;
+    
     this.messages = [];
     try {
+      if(window.localStorage.getItem('deployment_date') != window.deployment_date)
+        return; // - Deployment change since this was saved
       this.messages = JSON.parse(window.localStorage.getItem('messages'))
     } catch(e) {    };
     if(!this.messages || !this.messages.length)
@@ -303,6 +307,7 @@ var KamadanClient = {
     if(this.pendingSave && !force) return;
     var self=this;
     var doSave = function() {
+      window.localStorage.setItem('deployment_date',window.deployment_date);
       window.localStorage.setItem('messages',JSON.stringify(self.messages));
       self.pendingSave = null;
     };

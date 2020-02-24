@@ -47,7 +47,9 @@ Debian8_Official_amd64 = {
 VirtualBox = Ubuntu18_Official_amd64
 
 # ------------------    Definitions		 ------------------
-require "#{File.dirname(__FILE__)}/.env.rb"
+if File.file?("#{File.dirname(__FILE__)}/.env.rb") then
+  require "#{File.dirname(__FILE__)}/.env.rb"
+end
 
 server_config = {
 	'is_local'=>0,
@@ -63,7 +65,7 @@ server_config = {
   'db_user'=>'nodejs',
   'db_host'=>'127.0.0.1',
   'db_schema'=>'kamadan',
-  'db_pass'=>ENV["DB_PASS"] || '',
+  'db_pass'=>ENV["DB_PASS"] || 'K4maDan1423-zseq',
   'google_drive_backups_folder_id' => ENV["google_drive_backups_folder_id"],
   'google_apis_private_key' => ENV["google_apis_private_key"],
   'google_apis_client_email' => ENV["google_apis_client_email"]

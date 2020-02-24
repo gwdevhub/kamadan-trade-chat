@@ -11,6 +11,21 @@ DB_SCHEMA=$3
 PROJECT_CODE_FOLDER="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 printf "${RED}*** Project code folder is ${PROJECT_CODE_FOLDER} ***${NC}\n";
 SERVER_TIMEZONE="UTC"
+if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; then
+  # EC2 server, use dig to find our public IP.
+  SERVER_IP=$(dig +short myip.opendns.com @resolver1.opendns.com)
+else
+  # Local server, get last IP from hostname array
+  SERVER_IP=$(hostname -I | awk '{ print $NF}')
+fi
+printf "${RED}*** Server IP is ${SERVER_IP} ***${NC}\n";
+
+if [ "${SERVER_IP}" == "10.10.10.51" ]; then
+  SSH_IP="10.10.10.1"
+else
+  SSH_IP=$(echo $SSH_CLIENT | awk '{ print $1}')
+fi
+printf "${RED}*** Connected ssh client is ${SSH_IP} ***${NC}\n";
 
 REQUIRED_PACKAGES='apt-transport-https build-essential curl chrony mariadb-server software-properties-common tesseract-ocr tor nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1'
 
@@ -40,11 +55,17 @@ cmp -s "/etc/mysql/mariadb.conf.d/zz_project.cnf" "${PROJECT_CODE_FOLDER}/server
   printf "${RED}*** Configuring mariadb database: copying over ${PROJECT_CODE_FOLDER}/server/my.cnf ***${NC}\n";
   sudo cp -ura "${PROJECT_CODE_FOLDER}/server/my.cnf" "/etc/mysql/mariadb.conf.d/zz_project.cnf";
   sudo service mysql restart);
-sudo mysql -u ${DB_USER} -p${DB_PASS} -e "show processlist;" || (
-  printf "${RED}*** Configuring mariadb database: setting up user ${DB_USER} ***${NC}\n";
-  sudo mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';"; 
-  sudo mysql -u root -e "GRANT ALL PRIVILEGES ON * . * TO '${DB_USER}'@'%';FLUSH PRIVILEGES;";
-  sudo service mysql restart);
+# User management bits
+sudo mysql -u root -e "DROP USER IF EXISTS '${DB_USER}'@'%';";
+# Localhost
+sudo mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';";
+sudo mysql -u root -e "SET PASSWORD FOR '${DB_USER}'@'localhost' = PASSWORD('${DB_PASS}');";
+sudo mysql -u root -e "GRANT ALL PRIVILEGES ON * . * TO '${DB_USER}'@'localhost';";
+# Developer's IP address
+sudo mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'${SSH_IP}' IDENTIFIED BY '${DB_PASS}';";
+sudo mysql -u root -e "SET PASSWORD FOR '${DB_USER}'@'${SSH_IP}' = PASSWORD('${DB_PASS}');";
+sudo mysql -u root -e "GRANT ALL PRIVILEGES ON * . * TO '${DB_USER}'@'${SSH_IP}';";
+sudo mysql -u root -e "FLUSH PRIVILEGES;";
 sudo mysql -u ${DB_USER} -p${DB_PASS} -e "CREATE DATABASE IF NOT EXISTS ${DB_SCHEMA};";
 
 # NodeJS process:

@@ -7,6 +7,7 @@ server/node_modules/
 .vagrant/
 ssh/
 server/package-lock.json
+server_config.json
 
 # Bloated Windows Databases
 *.sdf

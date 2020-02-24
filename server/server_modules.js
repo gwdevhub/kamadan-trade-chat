@@ -6,6 +6,7 @@ WebSocketServer = require('ws').Server;
 ServerConfig = require(__dirname+'/ServerConfig.class.js');
 lockFile = require('lockfile');
 https = require('https');
+Mustache = require('mustache');
 
 serverScripts = {};
 
@@ -41,7 +42,10 @@ function preload() {
   console.log("\n--------------------------------\n");
 
 	console.log("\n---------- Loading Scripts ----------\n");
-	var script_files = fs.readdirSync(__dirname+'/scripts');
+  var script_files = [];
+  try {
+    script_files = fs.readdirSync(__dirname+'/scripts');
+  } catch(e) {}
 	for(var i in script_files) {
 		var func_name = /^([^.]+)\.js$/.exec(script_files[i]);
 		if(!func_name)

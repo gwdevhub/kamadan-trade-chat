@@ -19,6 +19,13 @@ fs.unlink(lock_file,function(){});
 var cached_message_log = "[]";
 var wssl;
 var wss;
+var render_cache = {};
+function renderFile(file) {
+  if(ServerConfig.isLocal() || !render_cache[file])
+    render_cache[file] = Mustache.render(fs.readFileSync(__dirname+'/index.html')+'',global);
+  return render_cache[file];
+}
+
 function init(cb) {
   KamadanTrade.init().then(function() {
     cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
@@ -41,7 +48,7 @@ function init(cb) {
 		// Helper function for caching, and set ETag
 		function expressCacheOptions(cache_time_ms) {
 			var headers = {
-				'Cache-Control': 'public, max-age='+(cache_time_ms/1000),
+				'Cache-Control': 'max-age='+(cache_time_ms/1000)+', immutable',
 				'Expires':new Date(Date.now()+cache_time_ms).toUTCString()
 			}
 			return {
@@ -64,8 +71,8 @@ function init(cb) {
 		// Deployment date is in format %Y%m%d%H%M%S and is found from ServerConfig.get('deployment_date')
 		let two_week_cache = expressCacheOptions(14*24*60*60*1000);
     let two_year_cache = expressCacheOptions(2*365*24*60*60*1000);
-		app.use('/.well-known/pki-validation',express.static(__dirname + '/.well-known/pki-validation',two_week_cache));
-    app.use('/.well-known/acme-challenge',express.static(__dirname + '/.well-known/acme-challenge',two_week_cache));
+		app.use('/.well-known/pki-validation',express.static(__dirname + '/.well-known/pki-validation'));
+    app.use('/.well-known/acme-challenge',express.static(__dirname + '/.well-known/acme-challenge'));
 		app.use(/^\/images([0-9]{14})?/,express.static(__dirname + '/images',two_year_cache));
 		app.use(/^\/css([0-9]{14})?/,express.static(__dirname + '/css',two_year_cache));
 		app.use(/^\/js([0-9]{14})?/,express.static(__dirname + '/js',two_year_cache));
@@ -132,7 +139,7 @@ function init(cb) {
       });
     });
     app.get('/', function(req,res) {
-      res.sendFile(__dirname+'/index.html');
+      res.send(renderFile(__dirname+'/index.html'));
     });
     app.get('/s/:term/:from?/:to?', function(req,res) {
       KamadanTrade.search(req.params.term,req.params.from,req.params.to).then(function(rows) {
