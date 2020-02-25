@@ -35,9 +35,11 @@ fs.unlink(lock_file,function(){});
 
 var cached_message_log = "[]";
 var render_cache = {};
-function renderFile(file) {
-  if(ServerConfig.isLocal() || !render_cache[file])
-    render_cache[file] = Mustache.render(fs.readFileSync(__dirname+'/index.html')+'',global);
+function renderFile(file,cache) {
+  if(typeof cache == 'undefined')
+    cache = true;
+  if(!cache || ServerConfig.isLocal() || !render_cache[file])
+    render_cache[file] = Handlebars.compile(fs.readFileSync(file)+'',global)(global);
   return render_cache[file];
 }
 
@@ -45,6 +47,53 @@ var http_server;
 var https_server;
 var ws_server;
 var wss_server;
+
+global.stats = {
+  server_started:new Date(),
+  connected_sockets:0,
+  most_connected_sockets:0
+};
+
+function updateStats() {
+  var ssl_sockets = 0;
+  var non_ssl_sockets = 0;
+  if(ws_server) {
+    ws_server.clients.forEach(function(client) {
+      if(client == ws_server)
+        return;
+      non_ssl_sockets++;
+    });
+  }
+  if(wss_server) {
+    wss_server.clients.forEach(function(client) {
+      if(client == wss_server)
+        return;
+      ssl_sockets++;
+    });
+  }
+  global.stats.connected_sockets = ssl_sockets + non_ssl_sockets;
+  if(global.stats.connected_sockets > global.stats.most_connected_sockets ) {
+    global.stats.most_connected_sockets = global.stats.connected_sockets;
+    global.stats.most_connected_at = new Date();
+  }
+  global.stats.ssl_enabled = global.ssl_info.enabled ? 1 : 0;
+  global.stats.ssl_domain = global.ssl_info.ssl_domain;
+  global.stats.ssl_expiry = global.ssl_info.ssl_expiry;
+  global.stats.status = "active";
+  return new Promise(function(resolve,reject) {
+    KamadanDB.query("SELECT max(t) t FROM kamadan_"+(new Date()).getUTCFullYear()).then(function(res) {
+      if(!res.length)
+        return;
+      global.stats.last_trade_message = new Date(res[0].t);
+    }).catch(function(e) {
+      console.error(e);
+    }).finally(function() {
+      if(!global.stats.last_trade_message || global.stats.last_trade_message.getTime() < Date.now() - 36e5)
+        global.stats.status = "stale";
+      return resolve(global.stats);
+    });
+  });
+}
 
 function init(cb) {
   KamadanTrade.init().then(function() {
@@ -92,6 +141,7 @@ function init(cb) {
 		app.set('x-powered-by', false);
     app.use(function (req, res, next) {  
       res.removeHeader("date");
+      res.set('X-Clacks-Overhead',"GNU Terry Pratchett"); // For Terry <3
       next();
     });
 		//-----------------------------------
@@ -128,6 +178,13 @@ function init(cb) {
         return console.error("/kill called from "+getIP(req)+" - naughty!");
       process.exit();
     });
+    app.get('/stats',function(req,res) {
+      updateStats().then(function(stats) {
+        res.json(stats);
+      }).catch(function(e) {
+        res.json({"status":"error"});
+      });;
+    });
     
     app.post(['/','/add'],function(req,res) {
       res.end();
@@ -147,12 +204,16 @@ function init(cb) {
               var sent_to = 0;
               if(ws_server) {
                 ws_server.clients.forEach(function each(client) {
+                  if (client == ws_server || client.readyState !== WebSocket.OPEN)
+                    return;
                   client.send(added_message);
                   sent_to++;
                 });
               }
               if(wss_server) {
                 wss_server.clients.forEach(function each(client) {
+                  if (client == wss_server || client.readyState !== WebSocket.OPEN)
+                    return;
                   client.send(added_message);
                   sent_to++;
                 });
@@ -218,6 +279,7 @@ function init(cb) {
     });
     
     websrvr.on('connection', function(ws) {
+      updateStats();
       ws.on('message', function(message) {
         if(!message.length) return;
         var obj;

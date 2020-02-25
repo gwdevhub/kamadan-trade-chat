@@ -370,7 +370,7 @@ var KamadanClient = {
       requeue();
     });
     req.open("GET", "/m");
-    req.setRequestHeader('If-None-Match',(this.getLastMessage() || {'h':'none'}).h);
+    req.setRequestHeader('If-None-Match',(this.getLastMessage() || {'t':0}).t);
     req.send();
   }
 };

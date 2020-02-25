@@ -2,11 +2,14 @@ express     = require('express');
 bodyParser  = require('body-parser');
 KamadanTrade = require(__dirname+'/KamadanTrade.class.js').KamadanTrade;
 morgan      = require('morgan');
-WebSocketServer = require('ws').Server;
+WebSocket = require('ws');
+WebSocketServer = WebSocket.Server;
 ServerConfig = require(__dirname+'/ServerConfig.class.js');
 lockFile = require('lockfile');
 https = require('https');
-Mustache = require('mustache');
+//Mustache = require('mustache');
+Handlebars = require("handlebars");
+KamadanDB = require(__dirname+'/KamadanDB.class.js');
 
 global.serverScripts = {};
 
