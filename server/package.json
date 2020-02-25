@@ -6,10 +6,10 @@
 		"body-parser": "~1.9.2",
 		"express": "*",
 		"morgan": "^1.9.1",
-		"sqlite3": "^4.1.1",
 		"ws": "^7.2.1",
     "lockfile":"1.0.4",
     "mariadb":"*",
-    "mustache":"*"
+    "mustache":"*",
+    "node-forge":"*"
 	}
 }

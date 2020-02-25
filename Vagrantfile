@@ -100,7 +100,9 @@ Machines = {
 			'ip_address' => '18.202.80.59',
 			'server_config' => cloud_config.merge({
 				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
-        'is_cloud'=>1
+        'is_cloud'=>1,
+        'ssl_domain'=>'kamadan.gwtoolbox.com',
+        'ssl_email'=>'jon@3vcloud.uk'
 			}),
 			'code_to_provision' => 'local',
 			#'rsync_path' => '~/local/bin/rsync',	# Custom rsync binary on server.

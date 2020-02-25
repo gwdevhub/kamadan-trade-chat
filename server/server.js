@@ -4,7 +4,24 @@ require("module").Module._initPaths();
 var fs = fs || require('fs');
 eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
-var ssl = { enabled:false };
+// Used for various SSL handling
+global.ssl_info = { 
+  enabled:false,
+  ssl_domain: ServerConfig.get('ssl_domain'),
+  ssl_email: ServerConfig.get('ssl_email')
+};
+if(!global.ssl_info.ssl_domain || !global.ssl_info.ssl_email) {
+  console.error("No SSL domain/email defined in server config (ssl_domain, ssl_email).\nThis server won't be running in SSL.");
+} else {
+  try {
+    global.ssl_info.key = fs.readFileSync('/etc/letsencrypt/live/'+global.ssl_info.ssl_domain+'/privkey.pem','utf8');
+    global.ssl_info.cert = fs.readFileSync('/etc/letsencrypt/live/'+global.ssl_info.ssl_domain+'/cert.pem','utf8');
+    global.ssl_info.ca = fs.readFileSync('/etc/letsencrypt/live/'+global.ssl_info.ssl_domain+'/chain.pem','utf8');
+    global.ssl_info.enabled = true;
+  } catch(e) {
+    console.error("There was a problem getting SSL keys for "+global.ssl_info.ssl_domain+".\nThis could be because the server is local.\nThis server won't be running in SSL.");
+  }
+}
 
 // Valid source IP Addresses that can submit new trade messages
 var whitelisted_sources = [
@@ -44,7 +61,7 @@ function init(cb) {
       app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
 
     app.get('*',function(request, response,next){
-      if(!request.secure && ssl.enabled){
+      if(!request.secure && global.ssl_info.enabled){
         console.log("redirected to https");
         response.writeHead(301, { "Location": "https://" + request.headers.host + request.url });
         response.end();
@@ -227,30 +244,18 @@ function init(cb) {
     });
     return websrvr;
   }
-	
-  
-  // Try to Gather SSL Certificate stuff
-  var ssl_domain = 'kamadan.gwtoolbox.com';
-  
-  try {
-    ssl.key = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domain+'/privkey.pem','utf8');
-    ssl.cert = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domain+'/cert.pem','utf8');
-    ssl.ca = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domain+'/chain.pem','utf8');
-    ssl.enabled = true;
-  } catch(e) {
-    console.error("There was a problem getting SSL keys for "+ssl_domain+".\n This could be because the server is local");
-  }
+
   var app = configureWebServer();
-  if(ssl.enabled) {
+  if(global.ssl_info.enabled) {
     try {
       if(https_server) {
         https_server.close();
         https_server = null;
       }
       https_server = https.createServer({
-        key: ssl.key,
-        cert: ssl.cert,
-        ca: ssl.ca
+        key: global.ssl_info.key,
+        cert: global.ssl_info.cert,
+        ca: global.ssl_info.ca
       });
       wss_server = configureWebsocketServer(https_server);
       https_server.on('request', app);
@@ -263,7 +268,7 @@ function init(cb) {
         http_server = null;
       }
     } catch(e) {
-      ssl.enabled = false;
+      global.ssl_info.enabled = false;
       console.error(e);
     }
   }
