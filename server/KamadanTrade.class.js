@@ -1,6 +1,8 @@
 var live_message_log = [];
 var live_message_log_max = 100;
 
+var fs = require('fs');
+
 Date.prototype.toStartOf = Date.prototype.toStartOf || function(unit) {
   switch (unit) {
     case "year": this.setMonth(0);
@@ -56,6 +58,22 @@ var KamadanTrade = {
       return sleep(500).then(function() { return self.init(); });
     this.initting = true;
     console.log("Initialising KamadanTrade");
+    
+    this.quarantine_regexes = [];
+    try {
+      var regex_strings = (fs.readFileSync(__dirname+'/chat_filter_regexes.txt')+'').split('\n');
+      for(var i=0;i<regex_strings.length;i++) {
+        regex_strings[i] = regex_strings[i].trim();
+        if(!regex_strings[i].length)
+          continue;
+        this.quarantine_regexes.push(new RegExp(regex_strings[i],'i'));
+      }
+      console.log("Chat filter regexes: ",this.quarantine_regexes);
+      
+    } catch(e) {
+      console.error("Failed to parse "+__dirname+'/chat_filter_regexes.txt');
+      console.error(e);
+    }
     this.db = require(__dirname+'/KamadanDB.class.js');
     setInterval(function() {
       self.housekeeping();
@@ -73,6 +91,7 @@ var KamadanTrade = {
       ENGINE=InnoDB;"
       
       return Promise.all([
+        self.db.query("CREATE TABLE IF NOT EXISTS kamadan.kamadan_quarantine "+create_statement),
         self.db.query("CREATE TABLE IF NOT EXISTS kamadan.kamadan_"+(year-5)+" "+create_statement),
         self.db.query("CREATE TABLE IF NOT EXISTS kamadan.kamadan_"+(year-4)+" "+create_statement),
         self.db.query("CREATE TABLE IF NOT EXISTS kamadan.kamadan_"+(year-3)+" "+create_statement),
@@ -92,6 +111,15 @@ var KamadanTrade = {
       console.log("KamadanTrade initialised");
       return Promise.resolve();
     });
+  },
+  quarantineCheck:function(message) {
+    // True on match
+    var msg = message.m.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    for(var i in this.quarantine_regexes) {
+      if(this.quarantine_regexes[i].test(msg))
+        return true;
+    }
+    return false;
   },
   search:function(term,from_unix_ms,to_unix_ms) {
     var self = this;
@@ -189,34 +217,42 @@ var KamadanTrade = {
     message.m = message.m.replace(/\\(\\|\[|\])/g,'$1');
     if(!message.m.length)
       return Promise.reject(new Error("Message is empty"));
+    var quarantined = this.quarantineCheck(message);
+    var table = 'kamadan_'+(new Date()).getUTCFullYear();
+    if(quarantined) {
+      console.log("Message hit quarantine: "+message.m);
+      table = 'kamadan_quarantine';
+    }
+    
     // Avoid spam by the same user (or multiple trade message sources!)
     var last_user_msg = this.last_message_by_user[message.s];
     if(last_user_msg && last_user_msg.m == message.m
     && Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
       console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"s diff");
-      return Promise.resolve(last_user_msg);
+      return Promise.resolve(quarantined ? false : last_user_msg);
     }
     var self = this;
+    
     // database message log
     return new Promise(function(resolve,reject) {
       self.init().then(function() {
-        var year = (new Date()).getUTCFullYear();
         // If this user has advertised this message in the last hour, just update it.
-        return self.db.query("UPDATE kamadan_"+year+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - 36e5]).then(function(res) {
+        return self.db.query("UPDATE "+table+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - 36e5]).then(function(res) {
           var done = function() {
             self.last_message_by_user[message.s] = message;
+            if(quarantined)
+              return resolve(false);
             // live message log
             self.live_message_log.unshift(message);
             while(self.live_message_log.length > live_message_log_max) {
               self.live_message_log.pop();
             }
             self.last_message = message;
-            console.log("Message added ok");
             return resolve(message);
           };
           if(res.affectedRows)
             return done();
-          return self.db.query("INSERT INTO kamadan.kamadan_"+year+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]).then(function(res) {
+          return self.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]).then(function(res) {
             return done();
           });
         });
