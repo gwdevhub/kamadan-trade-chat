@@ -228,8 +228,8 @@ var KamadanTrade = {
     var last_user_msg = this.last_message_by_user[message.s];
     if(last_user_msg && last_user_msg.m == message.m
     && Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
-      console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"s diff");
-      return Promise.resolve(quarantined ? false : last_user_msg);
+      console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"ms diff");
+      return Promise.resolve(false);
     }
     var self = this;
     
