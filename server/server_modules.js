@@ -1,6 +1,6 @@
 express     = require('express');
 bodyParser  = require('body-parser');
-KamadanTrade = require(__dirname+'/KamadanTrade.class.js').KamadanTrade;
+TradeModule = require(__dirname+'/KamadanTrade.class.js').KamadanTrade;
 morgan      = require('morgan');
 WebSocket = require('ws');
 WebSocketServer = WebSocket.Server;
@@ -30,7 +30,8 @@ function preload() {
   
 	console.log("\n---------- Loading Helper Functions/Classes ----------\n");
 	var helper_functions = [
-		__dirname+'/String.class.js'
+		__dirname+'/js/String.class.js',
+    __dirname+'/js/Date.class.js'
 	]
 	for(var i in helper_functions)
 		console.log(helper_functions[i]), eval(fs.readFileSync(helper_functions[i])+'');

@@ -66,9 +66,10 @@ server_config = {
   'db_host'=>'127.0.0.1',
   'db_schema'=>'kamadan',
   'db_pass'=>ENV["DB_PASS"] || 'K4maDan1423-zseq',
-  'google_drive_backups_folder_id' => ENV["google_drive_backups_folder_id"],
+  'google_drive_backups_folder_id' => '1ZzNLnWUmj3SbyoI3zc2MJBjRifLWGzpP',
   'google_apis_private_key' => ENV["google_apis_private_key"],
-  'google_apis_client_email' => ENV["google_apis_client_email"]
+  'google_apis_client_email' => ENV["google_apis_client_email"],
+  'ssl_domains' => ['kamadan.gwtoolbox.com','ascalon.gwtoolbox.com']
 }
 
 local_config = Marshal::load(Marshal.dump(server_config))

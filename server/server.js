@@ -34,13 +34,12 @@ var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
 var cached_message_log = "[]";
+var ascalon_message_log = "[]";
 var render_cache = {};
-function renderFile(file,cache) {
-  if(typeof cache == 'undefined')
-    cache = true;
-  if(!cache || ServerConfig.isLocal() || !render_cache[file])
-    render_cache[file] = Handlebars.compile(fs.readFileSync(file)+'',global)(global);
-  return render_cache[file];
+var compile_cache = {};
+function renderFile(file,is_presearing) {
+  compile_cache[file] = compile_cache[file] || Handlebars.compile(fs.readFileSync(file)+'');
+  return compile_cache[file]({config:global.config,is_presearing:is_presearing});
 }
 
 var http_server;
@@ -53,6 +52,32 @@ global.stats = {
   connected_sockets:0,
   most_connected_sockets:0
 };
+function getIP(req) {
+  return (req.header('x-forwarded-for') || req.connection.remoteAddress).split(':').pop();
+}
+function isLocal(req) {
+  return  getIP(req) == '127.0.0.1';
+}
+// Has this request object come from a trusted source?
+function isValidTradeSource(req) {
+  return  whitelisted_sources.indexOf(getIP(req)) != -1;
+}
+function isPreSearing(request) {
+  if(typeof request.is_presearing != 'undefined')
+    return request.is_presearing ? true : false;
+  var referer = request.header ? request.header('Referer') : false;
+  if(referer && /presear|ascalon/.test(referer))
+    return true;
+  if(typeof request.path == 'string' && /presear|ascalon/.test(request.path))
+    return true;
+  var host = false;
+  if(request.hostname) host = request.hostname;
+  else if(request.headers && request.headers.host) host = request.headers.host;
+  else if(request.host) host = request.host;
+  if(typeof host == 'string' && /presear|ascalon/.test(host))
+    return true;
+  return false;
+}
 
 function updateStats() {
   var ssl_sockets = 0;
@@ -95,10 +120,12 @@ function updateStats() {
   });
 }
 
+var KamadanTrade = new TradeModule();
+KamadanTrade.table_prefix = 'kamadan_';
+var AscalonTrade = new TradeModule();
+AscalonTrade.table_prefix = 'ascalon_';
+
 function init(cb) {
-  KamadanTrade.init().then(function() {
-    cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
-  });
 	cb = cb || function(){}
 	console.log("\n---------- Starting Web Server ----------\n");
 
@@ -110,7 +137,7 @@ function init(cb) {
       app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
 
     app.get('*',function(request, response,next){
-      if(!request.secure && global.ssl_info.enabled){
+      if(!request.secure && global.ssl_info.enabled && global.ssl_info.ssl_domain == request.hostname){
         console.log("redirected to https");
         response.writeHead(301, { "Location": "https://" + request.headers.host + request.url });
         response.end();
@@ -158,26 +185,7 @@ function init(cb) {
 		app.use(/^\/js([0-9]{14})?/,express.static(__dirname + '/js',two_year_cache));
 		app.use(/^\/fonts([0-9]{14})?/,express.static(__dirname + '/fonts',two_year_cache));
 		app.use('/favicon.ico',function(req,res,next) {return res.redirect(301,'/images/favicon.ico');});
-		
-    
-    
-    function getIP(req) {
-      return (req.header('x-forwarded-for') || req.connection.remoteAddress).split(':').pop();
-    }
-    function isLocal(req) {
-      return  getIP(req) == '127.0.0.1';
-    }
-    // Has this request object come from a trusted source?
-    function isValidTradeSource(req) {
-      return  whitelisted_sources.indexOf(getIP(req)) != -1;
-    }
-    
-    app.get('/kill',function(req,res) {
-      res.end();
-      if(!isLocal(req)) 
-        return console.error("/kill called from "+getIP(req)+" - naughty!");
-      process.exit();
-    });
+
     app.get('/stats',function(req,res) {
       updateStats().then(function(stats) {
         res.json(stats);
@@ -192,8 +200,10 @@ function init(cb) {
         return console.error("/add called from "+getIP(req)+" - naughty!");
       lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
         if(err) console.error(err);
+        var is_pre = isPreSearing(req);
+        var Trader = is_pre ? AscalonTrade : KamadanTrade;
         // Don't drop out on error; we'll unlock the stale file later
-        KamadanTrade.addMessage(req).then(function(added_message) {
+        Trader.addMessage(req).then(function(added_message) {
           if(!added_message) {
             console.log("No added message?");
             return; // Error adding message
@@ -206,6 +216,8 @@ function init(cb) {
                 ws_server.clients.forEach(function each(client) {
                   if (client == ws_server || client.readyState !== WebSocket.OPEN)
                     return;
+                  if(is_pre != isPreSearing(client))
+                    return;
                   client.send(added_message);
                   sent_to++;
                 });
@@ -214,13 +226,15 @@ function init(cb) {
                 wss_server.clients.forEach(function each(client) {
                   if (client == wss_server || client.readyState !== WebSocket.OPEN)
                     return;
+                  if(is_pre != isPreSearing(client))
+                    return;
                   client.send(added_message);
                   sent_to++;
                 });
               }
               console.log("Sent to "+sent_to+" connected sockets");
             }
-            cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+            Trader.cached_message_log = JSON.stringify(Trader.live_message_log);
           } catch(e) {
             console.error(e);
           }
@@ -232,10 +246,11 @@ function init(cb) {
       });
     });
     app.get('/', function(req,res) {
-      res.send(renderFile(__dirname+'/index.html'));
+      res.send(renderFile(__dirname+'/index.html',isPreSearing(req)));
     });
     app.get('/s/:term/:from?/:to?', function(req,res) {
-      KamadanTrade.search(req.params.term,req.params.from,req.params.to).then(function(rows) {
+      var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+      Trader.search(req.params.term,req.params.from,req.params.to).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {
         console.error(e);
@@ -243,8 +258,9 @@ function init(cb) {
       });
     });
     app.get('/u/:term/:from?/:to?', function(req,res) {
+      var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
       var user = ((req.params.term || req.query.term)+'').replace(/^user:/,'');
-      KamadanTrade.search('user:'+user,req.params.from,req.params.to).then(function(rows) {
+      Trader.search('user:'+user,req.params.from,req.params.to).then(function(rows) {
         res.json(rows);
       }).catch(function(e) {
         console.error(e);
@@ -253,17 +269,18 @@ function init(cb) {
     });
     app.get('/m',function(req,res) {
       var etag = req.header('if-none-match') || 'none';
+      var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
       // 304 if no new messages
-      if(!KamadanTrade.last_message)
+      if(!Trader.last_message)
         return res.status(304).end();
-      if(etag == KamadanTrade.last_message.t)
+      if(etag == Trader.last_message.t)
         return res.status(304).end();
       //console.log(KamadanTrade.last_message);
-      res.setHeader('ETag', KamadanTrade.last_message.t);
+      res.setHeader('ETag', Trader.last_message.t);
       
       // Return messages since last hash
       if(etag != 'none') {
-        return res.json(KamadanTrade.getMessagesSince(etag));
+        return res.json(Trader.getMessagesSince(etag));
       }
       // Otherwise return cached version
       res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -278,7 +295,8 @@ function init(cb) {
       server: server
     });
     
-    websrvr.on('connection', function(ws) {
+    websrvr.on('connection', function(ws, request) {
+      ws.is_presearing = isPreSearing(request);
       updateStats();
       ws.on('message', function(message) {
         if(!message.length) return;
@@ -290,12 +308,13 @@ function init(cb) {
           console.log(message);
           return;
         }
+        var Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
         if(typeof obj.since != 'undefined') {
-          var rows = KamadanTrade.getMessagesSince(obj.since || 'none');
+          var rows = Trader.getMessagesSince(obj.since || 'none');
           return ws.send(JSON.stringify({since:obj.since, num_results:rows.length,results:rows}));
         }
         if(typeof obj.query != 'undefined') {
-          return KamadanTrade.search(obj.query,obj.from || 0, obj.to || 0).then(function(rows) {
+          return Trader.search(obj.query,obj.from || 0, obj.to || 0).then(function(rows) {
             ws.send(JSON.stringify({query:obj.query, num_results:rows.length,results:rows}));
           }).catch(function(e) {
             console.error(e);
@@ -352,5 +371,11 @@ function init(cb) {
 preload().then(function() {
   // Check/renew SSL certificates daily.
   repeat_script('renew_ssl_certificates.js',864e5);
-  init();
+  KamadanTrade.init().then(function() {
+    cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+      AscalonTrade.init().then(function() {
+        cached_message_log = JSON.stringify(AscalonTrade.live_message_log);
+        init();
+      });
+  });
 });
