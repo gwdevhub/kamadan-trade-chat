@@ -213,7 +213,7 @@ KamadanTrade.prototype.addMessage = function(req) {
   return new Promise(function(resolve,reject) {
     self.init().then(function() {
       // If this user has advertised this message in the last hour, just update it.
-      return self.db.query("UPDATE "+table+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - 36e5]).then(function(res) {
+      return self.db.query("UPDATE "+table+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - (36e5 * 12)]).then(function(res) {
         var done = function() {
           self.last_message_by_user[message.s] = message;
           if(quarantined)
