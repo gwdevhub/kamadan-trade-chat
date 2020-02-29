@@ -68,8 +68,7 @@ server_config = {
   'db_pass'=>ENV["DB_PASS"] || 'K4maDan1423-zseq',
   'google_drive_backups_folder_id' => '1ZzNLnWUmj3SbyoI3zc2MJBjRifLWGzpP',
   'google_apis_private_key' => ENV["google_apis_private_key"],
-  'google_apis_client_email' => ENV["google_apis_client_email"],
-  'ssl_domains' => ['kamadan.gwtoolbox.com','ascalon.gwtoolbox.com']
+  'google_apis_client_email' => ENV["google_apis_client_email"]
 }
 
 local_config = Marshal::load(Marshal.dump(server_config))
@@ -102,8 +101,8 @@ Machines = {
 			'server_config' => cloud_config.merge({
 				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
         'is_cloud'=>1,
-        'ssl_domain'=>'kamadan.gwtoolbox.com',
-        'ssl_email'=>'jon@3vcloud.uk'
+        'ssl_email'=>'jon@3vcloud.uk',
+        'ssl_domains' => ['kamadan.gwtoolbox.com','ascalon.gwtoolbox.com']
 			}),
 			'code_to_provision' => 'local',
 			#'rsync_path' => '~/local/bin/rsync',	# Custom rsync binary on server.

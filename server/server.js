@@ -7,19 +7,31 @@ eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 // Used for various SSL handling
 global.ssl_info = { 
   enabled:false,
-  ssl_domain: ServerConfig.get('ssl_domain'),
+  ssl_domains: {},
   ssl_email: ServerConfig.get('ssl_email')
 };
-if(!global.ssl_info.ssl_domain || !global.ssl_info.ssl_email) {
-  console.error("No SSL domain/email defined in server config (ssl_domain, ssl_email).\nThis server won't be running in SSL.");
-} else {
+var ssl_domains = ServerConfig.get('ssl_domains') || [ServerConfig.get('ssl_domain')];
+for(var i in ssl_domains) {
+  if(!ssl_domains[i]) continue;
+  if(!global.ssl_info.ssl_email) {
+    console.error("No SSL email defined in server config (ssl_email).\nThis server won't be running in SSL."); 
+    break;
+  }
+  global.ssl_info.ssl_domains[ssl_domains[i]] = { enabled:false }
   try {
-    global.ssl_info.key = fs.readFileSync('/etc/letsencrypt/live/'+global.ssl_info.ssl_domain+'/privkey.pem','utf8');
-    global.ssl_info.cert = fs.readFileSync('/etc/letsencrypt/live/'+global.ssl_info.ssl_domain+'/cert.pem','utf8');
-    global.ssl_info.ca = fs.readFileSync('/etc/letsencrypt/live/'+global.ssl_info.ssl_domain+'/chain.pem','utf8');
+    global.ssl_info.ssl_domains[ssl_domains[i]].key = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/privkey.pem','utf8');
+    global.ssl_info.ssl_domains[ssl_domains[i]].cert = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/cert.pem','utf8');
+    global.ssl_info.ssl_domains[ssl_domains[i]].ca = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/chain.pem','utf8');
+    global.ssl_info.ssl_domains[ssl_domains[i]].secureContext = require('tls').createSecureContext({
+      key:  global.ssl_info.ssl_domains[ssl_domains[i]].key,
+      cert: global.ssl_info.ssl_domains[ssl_domains[i]].cert,
+      ca: global.ssl_info.ssl_domains[ssl_domains[i]].ca
+    });
+    global.ssl_info.ssl_domains[ssl_domains[i]].enabled = true;
     global.ssl_info.enabled = true;
   } catch(e) {
-    console.error("There was a problem getting SSL keys for "+global.ssl_info.ssl_domain+".\nThis could be because the server is local.\nThis server won't be running in SSL.");
+    console.error("There was a problem getting SSL keys for "+ssl_domains[i]+".\nThis could be because the server is local.\nThis server won't be running in SSL.");
+    console.error(e);
   }
 }
 
@@ -102,8 +114,11 @@ function updateStats() {
     global.stats.most_connected_at = new Date();
   }
   global.stats.ssl_enabled = global.ssl_info.enabled ? 1 : 0;
-  global.stats.ssl_domain = global.ssl_info.ssl_domain;
-  global.stats.ssl_expiry = global.ssl_info.ssl_expiry;
+  global.stats.ssl_domains = [];
+  for(var i in global.ssl_info.domains) {
+    if(!global.ssl_info.domains.enabled) continue;
+    global.stats.ssl_domains.push(i);
+  }
   global.stats.status = "active";
   return new Promise(function(resolve,reject) {
     KamadanDB.query("SELECT max(t) t FROM kamadan_"+(new Date()).getUTCFullYear()).then(function(res) {
@@ -137,8 +152,8 @@ function init(cb) {
       app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
 
     app.get('*',function(request, response,next){
-      if(!request.secure && global.ssl_info.enabled && global.ssl_info.ssl_domain == request.hostname){
-        console.log("redirected to https");
+      if(!request.secure && global.ssl_info.ssl_domains[request.hostname] && global.ssl_info.ssl_domains[request.hostname].enabled){
+        console.log("redirected "+request.headers.host + request.url+" to https");
         response.writeHead(301, { "Location": "https://" + request.headers.host + request.url });
         response.end();
         return;
@@ -333,7 +348,13 @@ function init(cb) {
         https_server.close();
         https_server = null;
       }
+      var https_contexts = {};
       https_server = https.createServer({
+        SNICallback:function(domain,cb) {
+          if(!global.ssl_info.ssl_domains[domain])
+            return cb(null,null);
+          return cb(null,global.ssl_info.ssl_domains[domain].secureContext);
+        },
         key: global.ssl_info.key,
         cert: global.ssl_info.cert,
         ca: global.ssl_info.ca
