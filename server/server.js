@@ -52,9 +52,19 @@ var cached_message_log = "[]";
 var ascalon_message_log = "[]";
 var render_cache = {};
 var compile_cache = {};
-function renderFile(file,is_presearing) {
+
+Handlebars.registerHelper("relativeTime", function(t) {
+  return (new Date(t)).relativeTime();
+});
+Handlebars.registerHelper("toJson", function(t) {
+  return JSON.stringify(t);
+});
+function renderFile(file,args) {
   compile_cache[file] = compile_cache[file] || Handlebars.compile(fs.readFileSync(file)+'');
-  return compile_cache[file]({config:global.config,is_presearing:is_presearing});
+  args = args || {};
+  args.config = global.config;
+  args.is_presearing = isPreSearing(args.req);
+  return compile_cache[file](args);
 }
 
 var http_server;
@@ -264,7 +274,16 @@ function init(cb) {
       });
     });
     app.get('/', function(req,res) {
-      res.send(renderFile(__dirname+'/index.html',isPreSearing(req)));
+      res.send(renderFile(__dirname+'/index.html',{req:req}));
+    });
+    app.get('/search/:term', function(req,res) {
+      var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+      Trader.search(req.params.term,0,0).then(function(rows) {
+        res.send(renderFile(__dirname+'/index.html',{req:req,messages:rows}));
+      }).catch(function(e) {
+        console.error(e);
+        res.send(renderFile(__dirname+'/index.html',{req:req,messages:[]}));
+      });
     });
     app.get('/s/:term/:from?/:to?', function(req,res) {
       var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;

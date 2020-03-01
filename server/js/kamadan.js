@@ -12,6 +12,7 @@ var KamadanClient = {
   },
   max_messages:100,
   last_search_term:'',
+  message_alert_checks:{},
   last_search_date:null,
   search_results:[],
   messages:[],
@@ -96,6 +97,8 @@ var KamadanClient = {
     if(window.location.protocol == 'https:') {
       this.websocket_url = "wss://"+window.location.hostname;
     }
+    this.last_search_term = this.getSearchTerm();
+    this.search_results = window.search_results || [];
     var self = this;
     document.getElementById('home-link').addEventListener('click',function(e) {
       e.preventDefault();
@@ -244,23 +247,36 @@ var KamadanClient = {
     if(!window.Notification || window.Notification.permission == 'denied' || window.location.protocol != 'https:')
       return;
     var self = this;
-    if (Notification.permission != "granted") {
-      return Notification.requestPermission().then(function (permission) {
-        checkAndNotify(new_messages);
-      });
-    }
-    var alert_checks = /wts/i;
+    
     var notification;
     for(var i=0;i<new_messages.length && !notification;i++) {
-      if(!alert_checks.test(new_messages[i].m))
-        continue;
-      var n = {
-        body:new_messages[i].s+': '+new_messages[i].m
-      };
-      if(getFavicon())
-        n.icon = getFavicon();
-      notification = new Notification("New trade message",n);
+      for(var j in this.message_alert_checks) {
+        var match = true;
+        for(var k in this.message_alert_checks[j]) {
+          if(notification || !match) break;
+          if(new_messages[i].indexOf(this.message_alert_checks[j]) < 0)
+            match = false;
+        }
+        if(notification) break;
+        if(!match) continue;
+        notification = {
+          title:"New trade message",
+          body:new_messages[i].s+': '+new_messages[i].m
+        };
+        if(getFavicon())
+          n.icon = getFavicon();
+      }
     }
+    if(!notification)
+      return; // Nothing to notify
+    if (Notification.permission != "granted") {
+      return Notification.requestPermission().then(function (permission) {
+        new Notification(notification.title,{body:notification.body,icon:notification.icon});
+      });
+    }
+  },
+  addMessageNotification:function(str) {
+    this.message_alert_checks[str] = str.split(' ');
   },
   animations:function() {
     var rows = document.querySelectorAll('.unanimated');

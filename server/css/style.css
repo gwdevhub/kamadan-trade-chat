@@ -102,6 +102,7 @@ button:active{
 #home-text{
     font:18px/34px "Arial Rounded MT Bold","Helvetica Rounded",Arial,sans-serif;
     font-weight:bold;
+    margin:0;
     margin-right:9px;
     margin-left:2px;
     vertical-align:middle;
