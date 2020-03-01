@@ -20,20 +20,23 @@ for(var i in ssl_domains) {
   global.ssl_info.ssl_domains[ssl_domains[i]] = { enabled:false }
   try {
     global.ssl_info.ssl_domains[ssl_domains[i]].key = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/privkey.pem','utf8');
-    global.ssl_info.ssl_domains[ssl_domains[i]].cert = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/cert.pem','utf8');
-    global.ssl_info.ssl_domains[ssl_domains[i]].ca = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/chain.pem','utf8');
+    global.ssl_info.ssl_domains[ssl_domains[i]].cert = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/fullchain.pem','utf8');
+    //global.ssl_info.ssl_domains[ssl_domains[i]].ca = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/chain.pem','utf8');
     global.ssl_info.ssl_domains[ssl_domains[i]].secureContext = require('tls').createSecureContext({
       key:  global.ssl_info.ssl_domains[ssl_domains[i]].key,
-      cert: global.ssl_info.ssl_domains[ssl_domains[i]].cert,
-      ca: global.ssl_info.ssl_domains[ssl_domains[i]].ca
+      cert: global.ssl_info.ssl_domains[ssl_domains[i]].cert
     });
     global.ssl_info.ssl_domains[ssl_domains[i]].enabled = true;
+    global.ssl_info.key = global.ssl_info.key || global.ssl_info.ssl_domains[ssl_domains[i]].key;
+    global.ssl_info.cert = global.ssl_info.cert || global.ssl_info.ssl_domains[ssl_domains[i]].cert;
+    //global.ssl_info.key = global.ssl_info.ca || global.ssl_info.ssl_domains[ssl_domains[i]].ca;
     global.ssl_info.enabled = true;
   } catch(e) {
     console.error("There was a problem getting SSL keys for "+ssl_domains[i]+".\nThis could be because the server is local.\nThis server won't be running in SSL.");
     console.error(e);
   }
 }
+console.log(global.ssl_info);
 
 // Valid source IP Addresses that can submit new trade messages
 var whitelisted_sources = [
@@ -352,12 +355,11 @@ function init(cb) {
       https_server = https.createServer({
         SNICallback:function(domain,cb) {
           if(!global.ssl_info.ssl_domains[domain])
-            return cb(null,null);
+            return cb("Invalid SSL domain");
           return cb(null,global.ssl_info.ssl_domains[domain].secureContext);
         },
         key: global.ssl_info.key,
-        cert: global.ssl_info.cert,
-        ca: global.ssl_info.ca
+        cert: global.ssl_info.cert
       });
       wss_server = configureWebsocketServer(https_server);
       https_server.on('request', app);
