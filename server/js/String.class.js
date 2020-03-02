@@ -116,7 +116,7 @@ String.prototype.removeSpaces = function() {
 	return this.replace(/[\s]/g,'');
 }
 String.prototype.removePunctuation = function() {
-	return this.replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,.\/:;<=>?@\[\]^`{|}~]/g,'').replace(/\s+/g,' ');
+	return this.replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,.\/:;<=>\-?@\[\]^`{|}~]/g,'').replace(/\s+/g,' ');
 }
 
 if(!String.prototype.isLongerThan) {

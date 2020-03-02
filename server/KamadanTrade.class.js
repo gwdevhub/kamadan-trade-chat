@@ -88,7 +88,7 @@ KamadanTrade.prototype.init = function() {
 KamadanTrade.prototype.quarantineCheck = function(message) {
   // True on match
   //var msg_norm_auto = message.m.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-  var msg_norm_manual = message.m.removeDiacritics().removePunctuation();
+  var msg_norm_manual = message.m.removeDiacritics().removePunctuation().removeSpaces();
   for(var i in this.quarantine_regexes) {
     //if(this.quarantine_regexes[i].test(msg_norm_auto))
     //  return true;
