@@ -48,8 +48,6 @@ var whitelisted_sources = [
 var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
-var cached_message_log = "[]";
-var ascalon_message_log = "[]";
 var render_cache = {};
 var compile_cache = {};
 
@@ -321,7 +319,7 @@ function init(cb) {
       }
       // Otherwise return cached version
       res.setHeader('content-type', 'application/json; charset=utf-8');
-      return res.send(cached_message_log);
+      return res.send(Trader.cached_message_log);
     });
     
     
@@ -414,9 +412,9 @@ preload().then(function() {
   // Check/renew SSL certificates daily.
   repeat_script('renew_ssl_certificates.js',864e5);
   KamadanTrade.init().then(function() {
-    cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+    KamadanTrade.cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
       AscalonTrade.init().then(function() {
-        cached_message_log = JSON.stringify(AscalonTrade.live_message_log);
+        AscalonTrade.cached_message_log = JSON.stringify(AscalonTrade.live_message_log);
         init();
       });
   });

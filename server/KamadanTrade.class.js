@@ -64,6 +64,7 @@ KamadanTrade.prototype.init = function() {
     ENGINE=InnoDB;"
     
     return Promise.all([
+      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+"searchlog ( term VARCHAR(100) NOT NULL, last_search BIGINT NOT NULL, count INT NOT NULL, PRIMARY KEY (term)) COLLATE='utf8mb4_general_ci'"),
       self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+"quarantine "+create_statement),
       self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year-5)+" "+create_statement),
       self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year-4)+" "+create_statement),
@@ -100,6 +101,7 @@ KamadanTrade.prototype.quarantineCheck = function(message) {
 KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
   var self = this;
   term = ((term || '')+'').toLowerCase().trim();
+  this.db.query("INSERT INTO "+self.table_prefix+"searchlog (term,last_search,count) VALUES (?,?,1) ON DUPLICATE KEY UPDATE last_search = ?, count = count+1",[term,Date.now(),Date.now()]);
   var by_user = false;
   if(term.indexOf('user:') == 0) {
     by_user = true;
