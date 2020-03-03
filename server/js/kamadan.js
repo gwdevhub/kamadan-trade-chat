@@ -32,9 +32,6 @@ var KamadanClient = {
       this.search_input.value = term;
     var term = this.getSearchTerm();
     offset = offset || 0;
-    this.last_searched_offset = offset;
-    this.last_search_term = term;
-    this.last_search_date = Date.now();
     var endpoint = '/s/';
     if(term.indexOf('user:') == 0) {
       term = term.substring(5);
@@ -45,12 +42,15 @@ var KamadanClient = {
     if(this.searching)
       return;
     this.searching = 1;
-    this.last_searched_term = term;
+    
+    this.last_search_date = Date.now();
     this.last_searched_offset = offset
-    if(offset == 0) {
+    if(this.last_search_term != term || offset == 0) {
       this.search_results = [];
       this.clearMessages();
+      window.scrollTo(0,0);
     }
+    this.last_search_term = term;
     var self = this;
     var req = new XMLHttpRequest();
     document.getElementById('search-info').innerHTML = "Searching for <i>"+term+"</i>...";
@@ -87,6 +87,7 @@ var KamadanClient = {
     return this.messages ? this.messages[0] : null;
   },
   init:function() {
+    window.scrollTo(0,0);
     this.current_wrapper = document.getElementById('current-wrapper');
     this.page_wrapper = document.getElementById('page');
     this.results_header = document.getElementById('results-header');
@@ -343,7 +344,7 @@ var KamadanClient = {
         this.search_results.unshift(json[i]);
       }
     }
-    if(this.search_results.length && this.search_results.length < 100) {
+    if(this.search_results.length && this.search_results.length < 25) {
       // No more messages to get; manually set last search offset to avoid polling again
       this.last_searched_offset = this.search_results[this.search_results.length - 1].t;
     }

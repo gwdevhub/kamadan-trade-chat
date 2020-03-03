@@ -1,5 +1,6 @@
 var live_message_log = [];
 var live_message_log_max = 100;
+var search_results_max = 25;
 
 var fs = require('fs');
 
@@ -161,13 +162,13 @@ KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
         where += " AND t > "+from_date.getTime();
       if(year == latest_year && to_date)
         where += " AND t < "+to_date.getTime();
-      var sql = "SELECT t,s,m FROM kamadan."+self.table_prefix+year+" "+where+" ORDER BY t DESC LIMIT "+live_message_log_max;
+      var sql = "SELECT t,s,m FROM kamadan."+self.table_prefix+year+" "+where+" ORDER BY t DESC LIMIT "+search_results_max;
       console.log(sql);
       return self.db.query(sql,args).then(function(rows) {
         for(var i in rows) {
           rows_final.push(rows[i]);
         }
-        if(rows_final.length < live_message_log_max)
+        if(rows_final.length < search_results_max)
           return searchYear(year-1);
         return Promise.resolve(rows_final);
       });
