@@ -30,13 +30,9 @@ var KamadanClient = {
   search:function(term,offset) {
     if(term)
       this.search_input.value = term;
-    var term = this.getSearchTerm();
+    term = this.getSearchTerm();
     offset = offset || 0;
     var endpoint = '/s/';
-    if(term.indexOf('user:') == 0) {
-      term = term.substring(5);
-      endpoint = '/u/';
-    }
     if(!term.length)
       return;
     if(this.searching)
