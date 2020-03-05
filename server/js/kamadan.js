@@ -219,7 +219,7 @@ var KamadanClient = {
     if(current_display == 'live' && this.current_wrapper.firstChild) {
       this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
     } else {
-      this.current_wrapper.append(HTML2DocumentFragment(html));
+      this.current_wrapper.appendChild(HTML2DocumentFragment(html));
     }
     if(current_display == 'live')
         this.checkAndNotify(to_add);
@@ -317,7 +317,7 @@ var KamadanClient = {
       return;
     this.redrawMessages();
   },
-  saveMessages:function(force = false) {
+  saveMessages:function(force) {
     if(!window.localStorage) return;
     if(this.pendingSave && !force) return;
     var self=this;

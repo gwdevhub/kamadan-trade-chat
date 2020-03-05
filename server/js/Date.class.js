@@ -172,7 +172,7 @@ Date.prototype.toLocalDate = function() {
 	return this;  
 }
 // e.g. 3 hours ago
-Date.prototype.relativeTime = function(unit='best-fit', date_to_compare = false) {
+Date.prototype.relativeTime = function(unit, date_to_compare) {
   var date = date_to_compare || new Date();
   const second = 1e3;
   const minute = 6e4;
