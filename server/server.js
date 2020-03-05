@@ -326,14 +326,21 @@ function init(cb) {
 		return app;
 	}
   function configureWebsocketServer(server) {
-    var websrvr = new WebSocketServer({
+    let websrvr = new WebSocketServer({
       server: server
     });
     
+    function heartbeat() {
+      this.isAlive = true;
+    }
+    
     websrvr.on('connection', function(ws, request) {
       ws.is_presearing = isPreSearing(request);
+      ws.isAlive = true;
+      ws.on('pong', heartbeat);
       updateStats();
       ws.on('message', function(message) {
+        this.heartbeat();
         if(!message.length) return;
         if(message.toLowerCase().trim() == 'ping')
           return ws.send('pong');
@@ -360,6 +367,13 @@ function init(cb) {
         }
       });
     });
+    const interval = setInterval(function ping() {
+      websrvr.clients.forEach(function each(ws) {
+        if (ws.isAlive === false) return ws.terminate();
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }, 30000);
     return websrvr;
   }
 

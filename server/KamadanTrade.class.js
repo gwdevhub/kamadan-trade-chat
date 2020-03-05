@@ -212,28 +212,35 @@ KamadanTrade.prototype.addMessage = function(req) {
   }
   var self = this;
   
+
+  
   // database message log
   return new Promise(function(resolve,reject) {
+    var done = function() {
+      self.last_message_by_user[message.s] = message;
+      if(quarantined)
+        return resolve(false);
+      // live message log
+      self.live_message_log.unshift(message);
+      while(self.live_message_log.length > live_message_log_max) {
+        self.live_message_log.pop();
+      }
+      self.last_message = message;
+      return resolve(message);
+    };
     self.init().then(function() {
       // If this user has advertised this message in the last 14 weeks, just update it.
-      return self.db.query("UPDATE "+table+" SET t = ? WHERE s = ? AND m = ? AND t > ?", [message.t,message.s,message.m,message.t - (864e5 * 14)]).then(function(res) {
-        var done = function() {
-          self.last_message_by_user[message.s] = message;
-          if(quarantined)
-            return resolve(false);
-          // live message log
-          self.live_message_log.unshift(message);
-          while(self.live_message_log.length > live_message_log_max) {
-            self.live_message_log.pop();
-          }
-          self.last_message = message;
-          return resolve(message);
-        };
-        if(res.affectedRows)
+      var update_query = "UPDATE "+table+" SET t = ? WHERE s = ? AND m = ? AND t > ? AND LAST_INSERT_ID(t)";
+      return self.db.query(update_query,[message.t,message.s,message.m,message.t - (864e5 * 14)]).then(function(res) {
+        if(res.affectedRows) {
+          console.log(res);
+          message.r = res.insertId;
           return done();
+        }
+        // None updated; INSERT.
         return self.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]).then(function(res) {
           return done();
-        });
+        }); 
       });
     });
   });

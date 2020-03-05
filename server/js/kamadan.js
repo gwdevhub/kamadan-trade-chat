@@ -13,11 +13,18 @@ var KamadanClient = {
   max_messages:100,
   last_search_term:'',
   message_alert_checks:{},
+  current_display:'live',
   last_search_date:null,
   search_results:[],
   messages:[],
   getSearchTerm:function() {
     return (this.search_input.value+'').trim();
+  },
+  clearSearch:function() {
+    this.search_input.value = this.last_search_term = '';
+    this.search_results = [];
+    this.current_display = 'live';
+    this.redrawMessages();
   },
   loadMore:function() {
     if(this.current_display != 'search' || !this.search_results.length || this.searching)
@@ -33,8 +40,7 @@ var KamadanClient = {
     term = this.getSearchTerm();
     offset = offset || 0;
     var endpoint = '/s/';
-    if(!term.length)
-      return;
+
     if(this.searching)
       return;
     this.searching = 1;
@@ -46,9 +52,15 @@ var KamadanClient = {
       this.clearMessages();
       window.scrollTo(0,0);
     }
-    this.last_search_term = term;
+    if(!term.length) {
+      this.searching = 0;
+      this.clearSearch();
+      return;
+    }
     var self = this;
     var req = new XMLHttpRequest();
+    this.current_display = 'search';
+    this.redrawMessages();
     document.getElementById('search-info').innerHTML = "Searching for <i>"+term+"</i>...";
     req.addEventListener("load", function() {
       var result = [];
@@ -58,13 +70,14 @@ var KamadanClient = {
       } catch(e) {
         self.error(e);
       }
-      self.search_input.value = self.last_search_term;
+      self.search_input.value = self.last_search_term = term;
+      self.current_display = 'search';
       self.parseSearchResults(result);
       self.searching = 0;
     });
     req.addEventListener("error",function() {
-      console.error(arguments);
-      self.search_input.value = self.last_search_term;
+      self.search_input.value = self.last_search_term = term;
+      self.current_display = 'search';
       self.parseSearchResults([]);
       self.searching = 0;
     });
@@ -99,9 +112,8 @@ var KamadanClient = {
     var self = this;
     document.getElementById('home-link').addEventListener('click',function(e) {
       e.preventDefault();
-      self.search_input.value = '';
       window.scrollTo(0,0);
-      self.redrawMessages();
+      self.clearSearch();
     });
     this.loadMessages();
     window.addEventListener("beforeunload", function(event) {
@@ -119,14 +131,6 @@ var KamadanClient = {
       e.preventDefault();
       self.search();
     });
-    var onchange = function(e) {
-      if(self.search_timer)
-        clearTimeout(self.search_timer);
-      if(!(self.search_input.value+'').trim().length)
-        return self.redrawMessages(true);
-    };
-    //this.search_input.addEventListener('keyup',onchange);
-    this.search_input.addEventListener('change',onchange);
     setInterval(function() {
       self.timestamps();
     },1000);
@@ -173,7 +177,7 @@ var KamadanClient = {
         try {
           var data = JSON.parse(evt.data);
           if(data && data.t && data.m && data.s)
-            self.parseMessages([data]);
+            self.parseMessages([data], true);
         }
         catch(e) {
           self.error(e);        
@@ -191,43 +195,40 @@ var KamadanClient = {
   },
   redrawMessages:function() {
     var html = '';
-    if(!this.getSearchTerm().length) {
+    var to_add = [];
+    
+    if(this.last_display != this.current_display)
+      this.clearMessages();
+    if(this.current_display != 'search') {
       document.getElementById('search-info').innerHTML = '';
     }
-    var to_add = [];
-    var messages = this.messages;
-    var current_display = 'live';
-
-    if(this.getSearchTerm().length) {
-      messages = this.search_results;
-      current_display = 'search';
-    }
-    if(current_display != this.current_display)
-      this.clearMessages();
+    var messages = this.current_display == 'search' ? this.search_results : this.messages;
+    
     for(var i = 0;i < messages.length ;i++) {
       if(document.getElementById(messages[i].t))
         continue;
       to_add.push(i);
     }
-    for(var i = to_add.length - 1;i >= 0 ;i--) {
-      html = '<tr class="row unanimated" id="'+messages[to_add[i]].t+'">\
-        <td class="info"><div class="name">'+messages[to_add[i]].s+'</div><div data-timestamp="'+messages[to_add[i]].t+'" class="age"></div></td>\
-        <td class="message">'+messages[to_add[i]].m+'</td>\
-      </tr>' + html;
+    if(to_add.length) {
+      for(var i = to_add.length - 1;i >= 0 ;i--) {
+        html = '<tr class="row unanimated" id="'+messages[to_add[i]].t+'">\
+          <td class="info"><div class="name">'+messages[to_add[i]].s+'</div><div data-timestamp="'+messages[to_add[i]].t+'" class="age"></div></td>\
+          <td class="message">'+messages[to_add[i]].m+'</td>\
+        </tr>' + html;
+      }
+      
+      if(to_add[0] == 0) {
+        this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
+      } else {
+        this.current_wrapper.appendChild(HTML2DocumentFragment(html));
+      }
+      this.timestamps();
+      this.animations();
+      this.checkAndNotify(to_add);
     }
-    // Use document fragment to prepend if available.
-    if(current_display == 'live' && this.current_wrapper.firstChild) {
-      this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
-    } else {
-      this.current_wrapper.appendChild(HTML2DocumentFragment(html));
-    }
-    if(current_display == 'live')
-        this.checkAndNotify(to_add);
-    this.current_display = current_display;
-    this.page_wrapper.className = 'display-'+current_display;
-    this.table_wrapper.className = 'display-'+current_display;
-    this.timestamps();
-    this.animations();
+    this.last_display = this.current_display;
+    this.page_wrapper.className = 'display-'+this.current_display;
+    this.table_wrapper.className = 'display-'+this.current_display;
   },
   timestamps:function() {
     var rows = document.querySelectorAll('.age');
@@ -288,15 +289,72 @@ var KamadanClient = {
       }
     },500);
   },
-  parseMessages:function(json) {
-    var latest_message = (this.getLastMessage() || {'h':''});
+  removeMessages:function(timestamps) {
+    var timestamp;
+    for(var j=0;j<timestamps.length;j++) {
+      timestamp = timestamps[j];
+      for(var i=0;i<this.messages.length;i++) {
+        if(this.messages[i].t == timestamp) {
+          this.messages.splice(i,1);
+          break;
+        }
+      }
+      for(var i=0;i<this.search_results.length;i++) {
+        if(this.search_results[i].t == timestamp) {
+          this.search_results.splice(i,1);
+          break;
+        }
+      }
+      var element = document.getElementById(timestamp);
+      if(element)
+        element.parentNode.removeChild(element);
+    }
+  },
+  parseMessages:function(json, check_against_search) {
     this.messages = this.messages || [];
     var has_new = false;
+    var remove_messages = [];
     for(var i=json.length-1; i >= 0;i--) {
+      if(json[i].r) {
+        remove_messages.push(json[i].r);
+        delete json[i].r;
+      }
       has_new = this.messages.unshift(json[i]);
     }
+    this.removeMessages(remove_messages);
     while(this.messages.length > this.max_messages) {
       this.messages.pop();
+    }
+    // Add to existing search results.
+    if(check_against_search && !this.searching && this.last_search_term.length) {
+      var term = this.last_search_term;
+      var search_words = [];
+      var checkSender = function(msg) {
+        return msg.s.toLowerCase() == term;
+      };
+      var checkMessage = function(msg) {
+        var toLower = msg.m.toLowerCase();
+        for(var i=0;i<search_words.length;i++) {
+          if(toLower.indexOf(search_words[i]) == -1)
+            return false;
+        }
+        return true;
+      };
+      var func;
+      if(term.indexOf('user:') == 0) {
+        term = term.substring(5).toLowerCase();
+        func = checkUser;
+      } else {
+        search_words = term.split(' ');
+        func = checkMessage;
+      }
+      var hits = [];
+      for(var i=json.length-1; i >= 0;i--) {
+        if(func(json[i]))
+          hits.unshift(json[i]);
+      }
+      if(hits.length)
+        this.parseSearchResults(hits);
     }
     if(has_new) {
       this.redrawMessages();
@@ -331,21 +389,25 @@ var KamadanClient = {
     this.pendingSave = setTimeout(doSave,5000);
   },
   parseSearchResults:function(json) {
-    if(this.search_results.length) {
-      for(var i=0; i < json.length;i++) {
-        this.search_results.push(json[i]);
-      }
-    } else {
-      for(var i=json.length - 1; i >= 0;i--) {
-        this.search_results.unshift(json[i]);
+    if(json.length) {
+      var push_or_unshift = this.search_results.length && this.search_results[0].t > json[0].t ? 'push' : 'unshift';
+      if(push_or_unshift == 'unshift') {
+        for(var i=json.length - 1; i >= 0;i--) {
+          this.search_results.unshift(json[i]);
+        }
+      } else {
+        for(var i=0; i < json.length;i++) {
+          this.search_results.push(json[i]);
+        }
       }
     }
     if(this.search_results.length && this.search_results.length < 25) {
       // No more messages to get; manually set last search offset to avoid polling again
       this.last_searched_offset = this.search_results[this.search_results.length - 1].t;
     }
-    this.redrawMessages(true);
-    document.getElementById('search-info').innerHTML = "Showing "+this.search_results.length+" results for <i>"+this.getSearchTerm()+"</i>";
+    this.redrawMessages();
+    if(this.current_display == 'search')
+      document.getElementById('search-info').innerHTML = "Showing "+this.search_results.length+" results for <i>"+this.last_search_term+"</i>";
   },
   poll:function(force) {
     var self = this;
