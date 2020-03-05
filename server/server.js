@@ -335,6 +335,8 @@ function init(cb) {
       updateStats();
       ws.on('message', function(message) {
         if(!message.length) return;
+        if(message.toLowerCase().trim() == 'ping')
+          return ws.send('pong');
         var obj;
         try {
           obj = JSON.parse(message);
