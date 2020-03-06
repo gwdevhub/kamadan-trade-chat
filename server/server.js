@@ -194,7 +194,8 @@ function init(cb) {
 		var limit_bytes = 1024*1024*1;	// 1 MB limit.
     if(ServerConfig.isLocal())
       app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
-
+    if(typeof compression != 'undefined')
+      app.use(compression())
     app.get('*',function(request, response,next){
       if(!request.secure && global.ssl_info.ssl_domains[request.hostname] && global.ssl_info.ssl_domains[request.hostname].enabled){
         console.log("redirected "+request.headers.host + request.url+" to https");

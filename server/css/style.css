@@ -529,7 +529,7 @@ table,tbody {
         transform:rotate(360deg)
     }
 }
-#modal{
+.modal{
     top:0;
     z-index:10;
     position:fixed;
@@ -537,11 +537,11 @@ table,tbody {
     width:100%;
     height:100%;
     background-color:rgba(0,0,0,0.3);
-    display:flex;
+    display:none; /*flex*/
     align-items:center;
     justify-content:center
 }
-#dialog{
+.dialog{
     padding:15px;
     background-color:#fff;
     border:1px solid #ccc;
@@ -553,7 +553,7 @@ table,tbody {
     min-height:0;
     overflow:hidden
 }
-#dialog h1{
+.dialog h1{
     padding:0 0 10px 0;
     margin:0 0 10px 0;
     font-size:18px;
@@ -561,7 +561,7 @@ table,tbody {
     display:block;
     border-bottom:1px solid #ccc
 }
-#command{
+.command{
     display:block;
     margin:18px 5px;
     font-family:monospace;
@@ -573,24 +573,24 @@ table,tbody {
     align-self:center;
     text-align:center
 }
-.message,#dialog,#command{
+.message,.dialog,.command{
     min-width:0;
     min-height:0;
     overflow:hidden
 }
-#dialog-footer{
+.dialog-footer{
     padding:10px 0 0 0;
     margin:22px 0 0 0;
     display:block;
     border-top:1px solid #ccc
 }
-#dismiss{
+.dismiss{
     display:block;
     margin-left:auto;
     font-size:14px;
     background-color:#f5f5f5
 }
-#dismiss:active{
+.dismiss:active{
     background-color:#eee
 }
 #mobile-app{

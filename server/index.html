@@ -62,7 +62,13 @@
         </div>
       </div>
     </div>
+    <div id="delete_message_modal" class="modal">
+      <div class="dialog">
+        <div>
+        <h1>Request message deletion</h1>To delete this message, log in with <strong id="delete_message_sender"></strong> and enter the following command:</div>
+        <div id="delete_message_cmd" class="command"></div><div class="dialog-footer"><button class="dismiss" id="delete_message_dismiss">Got it!</button></div></div></div>
     <script>
+      window.client_player_name = "{{config.client_player_name}}";
       window.deployment_date = {{config.deployment_date}};
       {{#with messages}}
       window.search_results = {{{toJson this}}};

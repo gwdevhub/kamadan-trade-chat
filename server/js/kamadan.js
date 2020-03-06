@@ -20,6 +20,13 @@ var KamadanClient = {
   getSearchTerm:function() {
     return (this.search_input.value+'').trim();
   },
+  promptDelete:function(message) {
+    if(!message || !window.client_player_name)
+      return;
+    document.getElementById('delete_message_sender').innerHTML = message.s;
+    document.getElementById('delete_message_cmd').innerHTML = "/whisper "+window.client_player_name+", DELETE "+message.t;
+    document.getElementById('delete_message_modal').style.display = 'flex';
+  },
   clearSearch:function() {
     this.search_input.value = this.last_search_term = '';
     this.search_results = [];
@@ -95,6 +102,17 @@ var KamadanClient = {
   getLastMessage:function() {
     return this.messages ? this.messages[0] : null;
   },
+  getMessageById:function(id) {
+    for(var i in this.messages) {
+      if(this.messages[i].t == id)
+        return this.messages[i];
+    }
+    for(var i in this.search_results) {
+      if(this.search_results[i].t == id)
+        return this.search_results[i];
+    }
+    return false;
+  },
   init:function() {
     window.scrollTo(0,0);
     this.current_wrapper = document.getElementById('current-wrapper');
@@ -110,6 +128,19 @@ var KamadanClient = {
     this.last_search_term = this.getSearchTerm();
     this.search_results = window.search_results || [];
     var self = this;
+    
+    this.current_wrapper.addEventListener('click',function(e) {
+      if(e.target.className != 'delete')
+        return;
+      var message = self.getMessageById(e.target.parentElement.id);
+      if(!message)
+        return;
+      self.promptDelete(message);
+    });
+    
+    document.getElementById('delete_message_dismiss').addEventListener('click',function(e) {
+      document.getElementById('delete_message_modal').style.display = 'none'
+    });
     document.getElementById('home-link').addEventListener('click',function(e) {
       e.preventDefault();
       window.scrollTo(0,0);
@@ -178,6 +209,8 @@ var KamadanClient = {
           var data = JSON.parse(evt.data);
           if(data && data.t && data.m && data.s)
             self.parseMessages([data], true);
+          else if(data && data.r)
+            self.removeMessages([data.r]);
         }
         catch(e) {
           self.error(e);        
@@ -214,6 +247,7 @@ var KamadanClient = {
         html = '<tr class="row unanimated" id="'+messages[to_add[i]].t+'">\
           <td class="info"><div class="name">'+messages[to_add[i]].s+'</div><div data-timestamp="'+messages[to_add[i]].t+'" class="age"></div></td>\
           <td class="message">'+messages[to_add[i]].m+'</td>\
+          <td class="delete"></td>\
         </tr>' + html;
       }
       

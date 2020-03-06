@@ -210,7 +210,7 @@ KamadanTrade.prototype.addWhisper = function(req,timestamp) {
   self.db.query("INSERT INTO whispers (t,s,m) values (?,?,?)",[message.t,message.s,message.m]);
   // Do something with this whisper
   var matches;
-  if(matches = /delete ([0-9]{13})/.exec(message.m)) {
+  if(matches = /delete ([0-9]{13})/i.exec(message.m)) {
     // Someone wants to delete a trade message.
     var date = new Date(parseInt(matches[1],10));
     if(date.getUTCFullYear() < 2015 || date.getTime() > Date.now())

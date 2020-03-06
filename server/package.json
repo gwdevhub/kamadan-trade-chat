@@ -10,6 +10,7 @@
     "lockfile":"1.0.4",
     "mariadb":"*",
     "handlebars":"*",
-    "node-forge":"*"
+    "node-forge":"*",
+    "compression":"*"
 	}
 }

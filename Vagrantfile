@@ -68,7 +68,8 @@ server_config = {
   'db_pass'=>ENV["DB_PASS"] || 'K4maDan1423-zseq',
   'google_drive_backups_folder_id' => '1ZzNLnWUmj3SbyoI3zc2MJBjRifLWGzpP',
   'google_apis_private_key' => ENV["google_apis_private_key"],
-  'google_apis_client_email' => ENV["google_apis_client_email"]
+  'google_apis_client_email' => ENV["google_apis_client_email"],
+  'client_player_name'=>'Lorraine Logsalot'
 }
 
 local_config = Marshal::load(Marshal.dump(server_config))

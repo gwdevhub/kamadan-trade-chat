@@ -9,6 +9,7 @@ lockFile = require('lockfile');
 https = require('https');
 crypto = require('crypto');
 tls = require('tls');
+compression = require('compression')
 //Mustache = require('mustache');
 Handlebars = require("handlebars");
 KamadanDB = require(__dirname+'/KamadanDB.class.js');
