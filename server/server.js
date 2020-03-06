@@ -151,6 +151,39 @@ KamadanTrade.table_prefix = 'kamadan_';
 var AscalonTrade = new TradeModule();
 AscalonTrade.table_prefix = 'ascalon_';
 
+function pushMessage(added_message,is_pre) {
+  try {
+    added_message = JSON.stringify(added_message);
+  } catch(e) {
+    added_message = ''; 
+  }
+  if(added_message.length) {
+    var sent_to = 0;
+    if(ws_server) {
+      ws_server.clients.forEach(function each(client) {
+        if (client == ws_server || client.readyState !== WebSocket.OPEN)
+          return;
+        if(is_pre != isPreSearing(client))
+          return;
+        client.send(added_message);
+        sent_to++;
+      });
+    }
+    if(wss_server) {
+      wss_server.clients.forEach(function each(client) {
+        if (client == wss_server || client.readyState !== WebSocket.OPEN)
+          return;
+        if(is_pre != isPreSearing(client))
+          return;
+        client.send(added_message);
+        sent_to++;
+      });
+    }
+    console.log("Sent to "+sent_to+" connected sockets");
+  }
+}
+
+
 function init(cb) {
 	cb = cb || function(){}
 	console.log("\n---------- Starting Web Server ----------\n");
@@ -219,47 +252,42 @@ function init(cb) {
         res.json({"status":"error"});
       });;
     });
-    
+    app.post('/whisper',function(req,res) {
+      res.end();
+      if(!isValidTradeSource(req)) 
+        return console.error("/whisper called from "+getIP(req)+" - naughty!");
+      var timestamp = Date.now();
+      var is_pre = isPreSearing(req);
+      var Trader = is_pre ? AscalonTrade : KamadanTrade;
+      lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
+        if(err) console.error(err);
+        Trader.addWhisper(req,timestamp).then(function(message) {
+          if(message)
+            pushMessage(message,is_pre);
+        }).catch(function(e) {
+          console.error(e);
+        }).finally(function() {
+          lockFile.unlock(lock_file);
+        });
+      });
+    });
     app.post(['/','/add'],function(req,res) {
       res.end();
       if(!isValidTradeSource(req)) 
         return console.error("/add called from "+getIP(req)+" - naughty!");
+      var timestamp = Date.now();
+      var is_pre = isPreSearing(req);
+      var Trader = is_pre ? AscalonTrade : KamadanTrade;
       lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
         if(err) console.error(err);
-        var is_pre = isPreSearing(req);
-        var Trader = is_pre ? AscalonTrade : KamadanTrade;
         // Don't drop out on error; we'll unlock the stale file later
-        Trader.addMessage(req).then(function(added_message) {
+        Trader.addMessage(req,timestamp).then(function(added_message) {
           if(!added_message) {
             console.log("No added message?");
             return; // Error adding message
           }
           try {
-            added_message = JSON.stringify(added_message);
-            if(added_message.length) {
-              var sent_to = 0;
-              if(ws_server) {
-                ws_server.clients.forEach(function each(client) {
-                  if (client == ws_server || client.readyState !== WebSocket.OPEN)
-                    return;
-                  if(is_pre != isPreSearing(client))
-                    return;
-                  client.send(added_message);
-                  sent_to++;
-                });
-              }
-              if(wss_server) {
-                wss_server.clients.forEach(function each(client) {
-                  if (client == wss_server || client.readyState !== WebSocket.OPEN)
-                    return;
-                  if(is_pre != isPreSearing(client))
-                    return;
-                  client.send(added_message);
-                  sent_to++;
-                });
-              }
-              console.log("Sent to "+sent_to+" connected sockets");
-            }
+            pushMessage(added_message,is_pre);
             Trader.cached_message_log = JSON.stringify(Trader.live_message_log);
           } catch(e) {
             console.error(e);

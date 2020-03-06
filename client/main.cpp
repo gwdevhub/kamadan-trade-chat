@@ -5,22 +5,36 @@
 
 struct TradeMessage {
     time_t    timestamp = 0;
-    std::string name;
-    std::string message;
-    inline bool contains(std::string search) {
-        auto it = std::search(
-            message.begin(), message.end(),
-            search.begin(), search.end(),
-            [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }
-        );
-        return (it != message.end());
-    };
+    char name[80];
+    char message[512];
+    uint32_t channel = 0;
+    inline void setSender(const wchar_t* _sender) {
+        #pragma warning(suppress : 4996)
+        int sender_length = wcstombs(name, _sender, sizeof(name));
+        if (sender_length == 0xffffffff)
+            throw "Failed to call wcstombs on sender";
+        name[sender_length] = 0;
+    }
+    inline void setMessage(const wchar_t* _message) {
+        #pragma warning(suppress : 4996)
+        int message_length = wcstombs(message, _message, sizeof(message));
+        if (message_length == 0xffffffff)
+            throw "Failed to call wcstombs on message";
+        message[message_length] = 0;
+        // Trim any trailing 0x1 chars.
+        for (size_t i = message_length - 1; i != 0; i--) {
+            if (message[i] != 0 && message[i] != 1)
+                break;
+            message[i] = 0;
+        }
+    }
 };
 
 static volatile bool running;
 // Hook entries
 GW::HookEntry HookEntry_MessageLocal;
 GW::HookEntry HookEntry_MapLoaded;
+GW::HookEntry HookEntry_WhisperReceived;
 static std::thread MessageSender;
 static std::queue<TradeMessage*> to_send;
 static FILE* stdout_proxy = nullptr;
@@ -47,6 +61,7 @@ namespace {
     static void Init() {
         static bool initted = false;
         if (initted) return;
+        setlocale(LC_ALL, "en_US.UTF-8");
         initted = true;
         #ifdef _DEBUG
                 AllocConsole();
@@ -62,8 +77,10 @@ namespace {
         #endif
 
         MessageSender = std::thread([]() {
-            char url[64];
-            snprintf(url,64,"http://%s/add", SERVER_HOST);
+            char trade_url[64];
+            snprintf(trade_url,64,"http://%s/add", SERVER_HOST);
+            char whisper_url[64];
+            snprintf(whisper_url, 64, "http://%s/whisper", SERVER_HOST);
             while (running) {
                 Sleep(100);
                 if (to_send.empty())
@@ -71,21 +88,33 @@ namespace {
                 auto m = to_send.front();
                 to_send.pop();
                 if (!m) continue;
-                printf("Sending trade message to server... ");
+                
                 try {
                     // you can pass http::InternetProtocol::V6 to Request to make an IPv6 request
-                    http::Request request(url);
+                    char* url = nullptr;
+                    switch (m->channel) {
+                        case static_cast<uint32_t>(GW::Chat::Channel::CHANNEL_TRADE) :
+                            url = &trade_url[0];
+                            break;
+                        case static_cast<uint32_t>(GW::Chat::Channel::CHANNEL_WHISPER) :
+                            url = &whisper_url[0];
+                            break;
+                    }
+                    if (url) {
+                        printf("Sending trade message to %s:\n%s ",url,m->message);
+                        http::Request request(url);
 
-                    // pass parameters as a map
-                    std::map<std::string, std::string> parameters = {
-                        {"timestamp", std::to_string(m->timestamp)},
-                        {"sender", m->name},
-                        {"message",m->message}
-                    };
-                    const http::Response response = request.send("POST", parameters, {
-                        "Content-Type: application/x-www-form-urlencoded"
-                        });
-                    printf("success\n");
+                        // pass parameters as a map
+                        std::map<std::string, std::string> parameters = {
+                            {"t", std::to_string(m->timestamp)},
+                            {"s", m->name},
+                            {"m",m->message}
+                        };
+                        const http::Response response = request.send("POST", parameters, {
+                            "Content-Type: application/x-www-form-urlencoded"
+                            });
+                        printf("success\n");
+                    }
                     //std::cout << std::string(response.body.begin(), response.body.end()) << '\n'; // print the result
                 }
                 catch (const std::exception & e)
@@ -107,6 +136,14 @@ namespace {
         // Map to kamadan ae1
         GW::StoC::RegisterPacketCallback<GW::Packet::StoC::MapLoaded>(&HookEntry_MapLoaded, [](GW::HookStatus*, GW::Packet::StoC::MapLoaded* pak) {
             CheckOutpost();
+            });
+        GW::Chat::RegisterWhisperCallback(&HookEntry_WhisperReceived, [](GW::HookStatus*, wchar_t* sender, wchar_t* message) {
+            TradeMessage* m = new TradeMessage();
+            m->channel = static_cast<uint32_t>(GW::Chat::Channel::CHANNEL_WHISPER);
+            m->setSender(sender);
+            m->setMessage(message);
+
+            to_send.push(m);
             });
         // Trade message received
         GW::StoC::RegisterPacketCallback<GW::Packet::StoC::MessageLocal>(&HookEntry_MessageLocal, [](GW::HookStatus*, GW::Packet::StoC::MessageLocal* pak) {
@@ -144,13 +181,9 @@ namespace {
                 delete m;
                 return;
             }
-            int size_needed = WideCharToMultiByte(CP_UTF8, 0, &message[0], (int)message.size(), NULL, 0, NULL, NULL);
-            m->message = std::string(size_needed, 0);
-            WideCharToMultiByte(CP_UTF8, 0, &message[0], (int)message.size(), &m->message[0], size_needed, NULL, NULL);
-
-            size_needed = WideCharToMultiByte(CP_UTF8, 0, &player_name[0], (int)player_name.size(), NULL, 0, NULL, NULL);
-            m->name = std::string(size_needed, 0);
-            WideCharToMultiByte(CP_UTF8, 0, &player_name[0], (int)player_name.size(), &m->name[0], size_needed, NULL, NULL);
+            m->channel = pak->channel;
+            m->setSender(player_name.c_str());
+            m->setMessage(message.c_str());
 
             to_send.push(m);
 

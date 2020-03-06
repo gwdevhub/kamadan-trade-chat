@@ -65,18 +65,20 @@ KamadanTrade.prototype.init = function() {
     ENGINE=InnoDB;"
     
     return Promise.all([
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+"searchlog ( term VARCHAR(100) NOT NULL, last_search BIGINT NOT NULL, count INT NOT NULL, PRIMARY KEY (term)) COLLATE='utf8mb4_general_ci'"),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+"quarantine "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year-5)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year-4)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year-3)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year-2)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year-1)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year+1)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year+2)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year+3)+" "+create_statement),
-      self.db.query("CREATE TABLE IF NOT EXISTS kamadan."+self.table_prefix+(year+4)+" "+create_statement)
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"searchlog ( term VARCHAR(100) NOT NULL, last_search BIGINT NOT NULL, count INT NOT NULL, PRIMARY KEY (term)) COLLATE='utf8mb4_general_ci'"),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"quarantine "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"deleted "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS whispers "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year-5)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year-4)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year-3)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year-2)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year-1)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year+1)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year+2)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year+3)+" "+create_statement),
+      self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+(year+4)+" "+create_statement)
     ]).then(function() {
       return self.seedLiveMessageLog();
     });
@@ -176,8 +178,7 @@ KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
     return searchYear(latest_year);
   });
 }
-KamadanTrade.prototype.addMessage = function(req) {
-  var timestamp = Date.now();
+KamadanTrade.prototype.parseMessageFromRequest = function(req,timestamp) {
   var body = req.body || '';
   if(typeof body == 'string') {
     try {
@@ -190,12 +191,54 @@ KamadanTrade.prototype.addMessage = function(req) {
     t:timestamp
   }
   if(!message.m || !message.s)
-    return Promise.reject(new Error("Missing sender/message when creating trade message"));
-  console.log("Trade message received OK");
+    return new Error("Missing sender/message when creating message");
+  
   // Parse message content
   message.m = message.m.replace(/\\(\\|\[|\])/g,'$1');
+  // 2020-03-06: RMT adding garbage to the end of their message
+  message.m = message.m.replace(/----[0-9]+$/,'');
   if(!message.m.length)
-    return Promise.reject(new Error("Message is empty"));
+    return new Error("Message is empty");
+  return message;
+}
+KamadanTrade.prototype.addWhisper = function(req,timestamp) {
+  var message = this.parseMessageFromRequest(req,timestamp);
+  var self = this;
+  if(message instanceof Error)
+    return Promise.reject(message);
+  console.log("Whisper received from "+message.s+": "+message.m);
+  self.db.query("INSERT INTO whispers (t,s,m) values (?,?,?)",[message.t,message.s,message.m]);
+  // Do something with this whisper
+  var matches;
+  if(matches = /delete ([0-9]{13})/.exec(message.m)) {
+    // Someone wants to delete a trade message.
+    var date = new Date(parseInt(matches[1],10));
+    if(date.getUTCFullYear() < 2015 || date.getTime() > Date.now())
+      return Promise.reject(new Error("Player "+message.s+" wants to delete message "+matches[1]+", but this is an invalid date"));
+    var r = date.getTime();
+    return new Promise(function(resolve,reject) {
+      self.db.query("INSERT INTO "+self.table_prefix+"deleted SELECT * FROM "+self.table_prefix+date.getUTCFullYear()+" WHERE t = ? AND s = ?",[r,message.s]).then(function(res) {
+        if(!res.affectedRows) 
+          return reject(new Error("Player "+message.s+" wants to delete message "+matches[1]+", but no rows were affected"));
+        self.db.query("DELETE FROM "+self.table_prefix+date.getUTCFullYear()+" WHERE t = ? AND s = ?",[r,message.s]);
+        for(var i=0;i < self.live_message_log.length;i++) {
+          if(self.live_message_log[i].t == r) {
+            self.live_message_log.splice(i,1);
+            break;
+          }
+        }
+        // Success; return object with "r" set to timestamp of message to remove via connected clients.
+        return resolve({r:r});
+      });
+    });
+  }
+  return Promise.resolve();
+}
+KamadanTrade.prototype.addMessage = function(req,timestamp) {
+  var message = this.parseMessageFromRequest(req,timestamp);
+  if(message instanceof Error)
+    return Promise.reject(message);
+  console.log("Trade message received OK");
   var quarantined = this.quarantineCheck(message);
   var table = this.table_prefix+(new Date()).getUTCFullYear();
   if(quarantined) {
@@ -211,9 +254,7 @@ KamadanTrade.prototype.addMessage = function(req) {
     return Promise.resolve(false);
   }
   var self = this;
-  
 
-  
   // database message log
   return new Promise(function(resolve,reject) {
     var done = function() {
@@ -222,6 +263,14 @@ KamadanTrade.prototype.addMessage = function(req) {
         return resolve(false);
       // live message log
       self.live_message_log.unshift(message);
+      if(message.r) {
+        for(var i=0;i < self.live_message_log.length;i++) {
+          if(self.live_message_log[i].t == message.r) {
+            self.live_message_log.splice(i,1);
+            break;
+          }
+        }
+      }
       while(self.live_message_log.length > live_message_log_max) {
         self.live_message_log.pop();
       }
