@@ -340,10 +340,8 @@ function init(cb) {
       ws.on('pong', heartbeat);
       updateStats();
       ws.on('message', function(message) {
-        this.heartbeat();
+        ws.isAlive = true;
         if(!message.length) return;
-        if(message.toLowerCase().trim() == 'ping')
-          return ws.send('pong');
         var obj;
         try {
           obj = JSON.parse(message);

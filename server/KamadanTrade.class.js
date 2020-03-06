@@ -230,12 +230,12 @@ KamadanTrade.prototype.addMessage = function(req) {
     };
     self.init().then(function() {
       // If this user has advertised this message in the last 14 weeks, just update it.
-      var update_query = "UPDATE "+table+" SET t = ? WHERE s = ? AND m = ? AND t > ? AND LAST_INSERT_ID(t)";
-      return self.db.query(update_query,[message.t,message.s,message.m,message.t - (864e5 * 14)]).then(function(res) {
-        if(res.affectedRows) {
-          console.log(res);
-          message.r = res.insertId;
-          return done();
+      return self.db.query("SELECT t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",[message.s,message.m,message.t - (864e5 * 14)]).then(function(res) {
+        if(res.length) {
+          message.r = res[0].t;
+          return self.db.query("UPDATE "+table+" SET t = ? WHERE t = ?",[message.t,res[0].t]).then(function() {
+            return done();
+          });
         }
         // None updated; INSERT.
         return self.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]).then(function(res) {
