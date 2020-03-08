@@ -43,7 +43,7 @@ var whitelisted_sources = [
 '127.0.0.1',
 '10.10.10.1',
 '142.44.211.74', // Greg
-'176.248.118.201'// Me
+'5.67.147.12'// Me
 ];
 var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
@@ -80,6 +80,12 @@ function getIP(req) {
 }
 function isLocal(req) {
   return  getIP(req) == '127.0.0.1';
+}
+// Should this request be gzip compressed?
+function shouldCompress (req, res) {
+  if(/stats/.test(req.url))
+    return false; // Disabled for /stats endpoint.
+  return compression.filter(req, res);
 }
 // Has this request object come from a trusted source?
 function isValidTradeSource(req) {
@@ -194,9 +200,14 @@ function init(cb) {
 		var limit_bytes = 1024*1024*1;	// 1 MB limit.
     if(ServerConfig.isLocal())
       app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
-    if(typeof compression != 'undefined')
+    if(typeof compression != 'undefined') {
+      app.use(compression({ filter: shouldCompress }))
+      
+    }
       app.use(compression())
     app.get('*',function(request, response,next){
+       if(/stats/.test(request.url))
+        return next(); // Disabled for /stats endpoint.
       if(!request.secure && global.ssl_info.ssl_domains[request.hostname] && global.ssl_info.ssl_domains[request.hostname].enabled){
         console.log("redirected "+request.headers.host + request.url+" to https");
         response.writeHead(301, { "Location": "https://" + request.headers.host + request.url });
@@ -251,7 +262,7 @@ function init(cb) {
         res.json(stats);
       }).catch(function(e) {
         res.json({"status":"error"});
-      });;
+      });
     });
     app.post('/whisper',function(req,res) {
       res.end();
