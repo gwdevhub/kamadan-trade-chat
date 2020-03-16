@@ -248,10 +248,13 @@ KamadanTrade.prototype.addMessage = function(req,timestamp) {
   
   // Avoid spam by the same user (or multiple trade message sources!)
   var last_user_msg = this.last_message_by_user[message.s];
-  if(last_user_msg && last_user_msg.m == message.m
-  && Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
-    console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"ms diff");
-    return Promise.resolve(false);
+  if(last_user_msg && last_user_msg.m.removePunctuation() == message.m.removePunctuation()) {
+    if(Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
+      console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"ms diff");
+      return Promise.resolve(false);
+    }
+    // Avoid spammers adding random chars to their trade message by consolidating it.
+    message.m = last_user_msg.m;
   }
   var self = this;
 
