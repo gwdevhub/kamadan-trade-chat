@@ -465,6 +465,7 @@ function init(cb) {
 preload().then(function() {
   // Check/renew SSL certificates daily.
   repeat_script('renew_ssl_certificates.js',864e5);
+  repeat_script('run_client.js',60000);
   KamadanTrade.init().then(function() {
     KamadanTrade.cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
       AscalonTrade.init().then(function() {
