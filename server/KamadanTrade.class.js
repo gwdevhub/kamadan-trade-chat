@@ -24,6 +24,66 @@ KamadanTrade.prototype.housekeeping = function() {
       delete this.last_message_by_user[i];
   }
 };
+KamadanTrade.prototype.addTraderPrices = function(json) {
+  var self = this;
+  return new Promise(function(resolve,reject) {
+    self.getTraderPrices().then(function(current_prices) {
+      var updated_prices = [];
+      var models_done = {buy:{},sell:{}};
+      for(var key in models_done) {
+        for(var i in json[key]) {
+          var current = current_prices[key][json[key][i].m];
+          if(models_done[key][json[key][i].m])
+            continue;
+          models_done[key][json[key][i].m] = 1;
+          if(!current || current.p != json[key][i].p) {
+            updated_prices.push({m:json[key][i].m,p:json[key][i].p,t:json[key][i].t,s:key == 'buy' ? 0 : 1});
+          }
+        }
+      }
+      if(!updated_prices.length) {
+        console.log("No prices updated");
+        return resolve(current_prices);
+      }
+      var sql_args = [];
+      var sql_insert = [];
+      for(var i in updated_prices) {
+        sql_args.push(updated_prices[i].m);
+        sql_args.push(updated_prices[i].p);
+        sql_args.push(updated_prices[i].t);
+        sql_args.push(updated_prices[i].s);
+        sql_insert.push('(?,?,?,?)');
+      }
+      self.db.query("INSERT INTO trader_prices (m,p,t,s) VALUES "+sql_insert.join(','),sql_args).then(function(res) {
+        console.log("Trader prices updated: "+res.affectedRows);
+      }).finally(function() {
+        self.getTraderPrices().then(function(prices) {
+          resolve(prices);
+        });
+      });
+    });
+  });
+  
+}
+KamadanTrade.prototype.getTraderPrices = function() {
+  var self = this;
+  var result = {buy:{},sell:{}};
+  return new Promise(function(resolve,reject) {
+    self.db.query("SELECT m,p,t,s FROM trader_prices GROUP BY m,s ORDER BY t DESC").then(function(rows) {
+      for(var i=0;i<rows.length;i++) {
+        var res = {p:rows[i].p,t:rows[i].t};
+        if(rows[i].s) {
+          result.sell[rows[i].m] = res;
+        } else {
+          result.buy[rows[i].m] = res;
+        }
+      }
+    }).finally(function() {
+      return resolve(result);
+    });
+  });
+  
+}
 KamadanTrade.prototype.init = function() {
   var self = this;
   if(this.initted)
@@ -62,9 +122,20 @@ KamadanTrade.prototype.init = function() {
       INDEX s (s)\
     )\
     COLLATE='utf8mb4_general_ci'\
-    ENGINE=InnoDB;"
+    ENGINE=InnoDB;";
+    var item_prices_table = "CREATE TABLE IF NOT EXISTS trader_prices (\
+      t BIGINT(20) UNSIGNED NOT NULL COMMENT 'Unix timestamp with milliseconds',\
+      m INT UNSIGNED NOT NULL COMMENT 'model_id of quoted item',\
+      s TINYINT NOT NULL COMMENT '1 if sell quote, 1 if buy quote',\
+      p INT UNSIGNED NOT NULL COMMENT 'UTC timestamp of quote',\
+      PRIMARY KEY (t,m),\
+      INDEX m (m)\
+      )\
+      COLLATE='utf8mb4_general_ci'\
+      ENGINE=InnoDB;";
     
     return Promise.all([
+      self.db.query(item_prices_table),
       self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"searchlog ( term VARCHAR(100) NOT NULL, last_search BIGINT NOT NULL, count INT NOT NULL, PRIMARY KEY (term)) COLLATE='utf8mb4_general_ci'"),
       self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"quarantine "+create_statement),
       self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"deleted "+create_statement),

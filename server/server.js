@@ -283,6 +283,34 @@ function init(cb) {
         });
       });
     });
+    app.post(['/trader_quotes'],function(req,res) {
+      res.end();
+      if(!isValidTradeSource(req)) 
+        return console.error("/add called from "+getIP(req)+" - naughty!");
+      var json = false;
+      try {
+        if(req.body.json)
+          json = JSON.parse(req.body.json);
+        if(!json)
+          json = JSON.parse(req.body);          
+      } catch(e) {
+        console.error("Invalid or malformed json in /trader_quotes");
+        return;
+      }
+      console.log("/trader_quotes:",json);
+      lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
+        if(err) console.error(err);
+        console.log("Trader quotes added");
+        // Don't drop out on error; we'll unlock the stale file later
+        KamadanTrade.addTraderPrices(json).then(function(current_trader_quotes) {
+          console.log("Trader prices updated");
+        }).catch(function(e) {
+          console.error(e);
+        }).finally(function() {
+          lockFile.unlock(lock_file);
+        });
+      });
+    });
     app.post(['/','/add'],function(req,res) {
       res.end();
       if(!isValidTradeSource(req)) 
