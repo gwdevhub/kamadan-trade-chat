@@ -5,12 +5,10 @@ if(typeof exec == 'undefined') {
    
 }
 var exec = exec || require('child_process').exec; 
-return new Promise(function(resolve,reject) {
-  exec('ps -elf | grep "[-]character"',function(a,stdout,c) {
-    if(stdout.indexOf('-character') != -1)
-      return;
-    exec('cd ~/kamadan-trade-client && sudo sh run_client.sh > /dev/null 2>&1');
-  }); 
-  resolve();
+exec('ps -elf | grep "[-]character"',function(a,stdout,c) {
+  if(stdout.indexOf('-character') != -1)
+    return;// console.log("Guild Wars client already running!\n"+stdout);
+  console.log("Starting Guild Wars client!");
+  exec('cd ~/kamadan-trade-client && sudo sh run_client.sh > /dev/null 2>&1');
 });
-
+return Promise.resolve();

@@ -77,7 +77,9 @@ function run_script(script) {
       for(var i in global.serverScripts) console.log("  serverScripts."+i+" = "+(typeof global.serverScripts[i]));
       reject("No valid script "+script);
     }
-    return global.serverScripts[script].apply(serverScripts).catch(function(err) {
+    return global.serverScripts[script].apply(serverScripts).then(function() {
+      return resolve();
+    }).catch(function(err) {
       reject(err);
     });
   }).catch(function(err) {
@@ -87,15 +89,13 @@ function run_script(script) {
 var periodicScripts = {};
 function repeat_script(script,interval) {
   if(periodicScripts[script] && periodicScripts[script].interval < interval)
-    return; // Already queued
-  if(periodicScripts[script] && periodicScripts[script].timeout)
-    clearTimeout(periodicScripts[script].timeout);
+    return console.log(script+" already queued"); // Already queued
   periodicScripts[script] = {interval:interval,timeout:null};
   run_script(script).catch(function(e) {
     console.error("repeat_every_day for "+script+" failed!");
     console.error(e);
   }).finally(function() {
-    console.log("repeat_every_hour for "+script+" finished, reqeueing...");
-    periodicScripts[script].timeout = setTimeout(function() { repeat_script(script,repeat_script) },interval);
+    console.log("repeat_script for "+script+" finished, reqeueing...");
+    setTimeout(function() { repeat_script(script,interval) },interval);
   });
 }
