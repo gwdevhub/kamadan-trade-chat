@@ -1,3 +1,21 @@
+var GuildWars = {
+  // data:image/png;base64,
+  materials:{
+    930:{
+      name:"Glob of Ectoplasm",
+      icon:"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"
+    },
+    933:{
+      name:"10 Feathers",
+      icon:"iVBORw0KGgoAAAANSUhEUgAAABQAAAAYCAYAAAD6S912AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEgAACxIB0t1+/AAAAAd0SU1FB9sDEBYhEsQZ0GoAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjEuNv1OCegAAANWSURBVEhLnZVtSFNhFMe33d3NeTdyuk1zvqyamqabLVNTI1YWpWGalS6KSIsyI2hEhb18sSBkXzKtyNJNe9MPab5tc1Nz1ZyREZkWUagEBUGhHyTC3Ok884uf2tU//Lj3Puf/HO7z3Oecy1miqCCGTgoXBFwMpgR78FmO8HyRRYqrYJjQFRLGGBVAT68Ti0ETGDjF5wdsxJh43sJeXIZhFInyENfOiAhIY4SQyoggmRHNCgSC0xgPnbexE08iEcSmJarfFaXEw35tHOhlQRApXTYXror+RtN0KXqUCNfnZiEmfX1S/aHd2+DiwT2Qr4sHHSZMUi7/kbByxUcezduHHtZvSHMoTmGV6ZK3u6MZKk4chi261bBVGw9FmekQG6YYQk8BovC5/YgrkUjiRBKqzuG0g9v9Ag4YdkBhfjbsLcgFtSpqhM/jnUdfKhLom+FHweVlx5xhSvnPvj4nXKgoh8wMDahXhYNOt8YrFgfWoGc7Eo743T/hzrycUy3ND7x36+vAZrOCw2YH69MWuFZZ4U1YrR5AzxFkJcInE/4nrlKh1Dx88Hja4XSBxzMMt+/cAbPFDPYeO5QeLR1GjxHZgLA6f5IjpSeful+OgGfoLZibmjCREzo6WqG2tmaaS3Er0aNHghH/R0Uulyc/aX392z04Ae8/TILV1gtt7R3g6u/5Gx0dYUHLXiQSYXXuRCUlJSab4wWMYbIb1TXQaXOAo+8Z6PV6N8bJviUgAmJmI3ntzVsDnldvwNHbD12dPdBttYPZbPnF5/MvYzwDYXxOFiIdQ5WTlzczPj6OiWww+PINeNwe2JK9qRtjhQgpMdbCsqS1JtP12YnJ7zDgGoTOrp4/Wu3aNoydRDSIkBjZiGxwokqlenS8rGyUJCsqNoBGqxmOWRXTTlEUOcCk77EWhUSnpqbYjMZT3qbGx9Df+xxMVaY5kUhEvmwWwqq8FipuV17u1y9fPoOlwYLJqmY26zc9w3Gy3DWI34pYKBpJv3qlcmZsbBQa7jVCZlbWJxwjzTMNCUIWJbLkWIPB4LJYLLMhCtkUJaSu4dhWJARh3TwXKuzc2TP3ZTJZNd6fQ/KRKGRJPyAiaUbGBvIBSEtPQUhbIluxZAVLpdJivG5GpMgil8nh/AMSWCpDefqtzgAAAABJRU5ErkJggg=="
+    },
+    934:{
+      name:"10 Plant Fibers",
+      icon:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEgAACxIB0t1+/AAAAAd0SU1FB9sDEBYhLAV4zcEAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjEuNv1OCegAAAOZSURBVDhPYyASMEJpkgFTRKCrE5CWBLHBIiQAkAa+uuK49UAaZAgnSJBYwDGxq7qEi5XVMDncbaqutlpKRWlSLFBcFIgJeoc5NMA5Pi7K54OetuqSeZNqLnc2F57vaCt6ys3N7QyUJ+gSDgkJCa9JbWXfmyuz/hfnxv3PTPD9pKersbK2IHYaUB4UHjgB+4wZ3Z2pMV53qguT/7ZUpP8PdNP/P3dS6VtdHbXuvq6Cg0A1mkCM0xuiKcmRe2ZOqPyfmxb7v7Mm439soMP/1tqUv20NhT/K86JeAtXYAjErWDUaYAFiEXtr49aS3PhTSxdO/V9RkPS/MD38j7mJ2hZ/b4erSREe/80NNCqA6gTAOpAAe1FBXH96akRHVXnOiSmTGw411xf9L82N+T9vasMvbU21ttAAl6lJ0X7/o4KclgHVK0K0QQBHfGxARn1NzjdPF4v/lma6//08HP8oK8o87+ko/xIV7nmqqyn3X0tj3v+kWKf/bXVpP2tKk/KB+iCucHa2NDx6aOO/nq6K/+6u5v8bakv+iwsLngVK1Xu5WtzJSgm8rqujssjb3epSUVbY/4hgp4N6OsqVQHllIGZi0NVVNlq9fMqPhtqc/zY2hruUleQeWJvqHwJK+pgbafyOCnb+l5kUvjrA03zdhM7i/0JCfPXWFgbJbdUZ8ZV5ETFAdQxyqYnBO8KDXf4bG2quU1dX3Rng4/LW18u2N8DH5p+thc7/Kb21b5ysdRfJSIoc62wp/rhuae+fkpzoR/ZW+nNABvDYWhtl93WX3F6/dvo/O1vzB0YGOv/L8qP+J0e7/zfUkf9fU5nyNzcr+GtWiv/LIF/bz2nJ/k9kZcUmAfWGgQxgBiZRHSAd7e1hv7YwL/Z/X0fefz0dtf/62vL/A32s/rs5Gt8XExWeWJcf+qm9Nvt/T0vR/+7GjGd5aZ6LQAawpWbEZFZVZp2LifY9OKG35n9yYvB/E0OV/yG+Vt9Dfaz/ezuZ/JGREKgvLY743AqMjfAA56/G+uoLgHrjQQaAEpCOi7PVOnl5qUmeHg67/f1cDwjwcfWHBzqt9HK1/KyrpfLfyc7gq5KCxP/ocPf/CfEB+4B6AoFYBmQACAhzsrGBBHyA2BWIA4DYzMJIO4WDja26rir3AtB178yMNN9HhLgeZ2NhKgTKgxITPE+wAbEsEAsDMSi78gMxKL1LAbEhMzODJ5DOAeJMIAY5Wx+IORgYGBgATcc/J/v0QNcAAAAASUVORK5CYII="
+    }
+  }
+}
+
 var KamadanClient = {
   poll_interval:3000,
   ws_interval:60000,
@@ -53,7 +71,7 @@ var KamadanClient = {
     this.searching = 1;
     
     this.last_search_date = Date.now();
-    this.last_searched_offset = offset
+    this.last_searched_offset = offset;
     if(this.last_search_term != term || offset == 0) {
       this.search_results = [];
       this.clearMessages();
@@ -142,6 +160,8 @@ var KamadanClient = {
       document.getElementById('delete_message_modal').style.display = 'none'
     });
     document.getElementById('home-link').addEventListener('click',function(e) {
+      if(window.location.pathname.length > 1)
+        return;
       e.preventDefault();
       window.scrollTo(0,0);
       self.clearSearch();
@@ -174,6 +194,9 @@ var KamadanClient = {
     this.setWebsocketInterval(20000);
     this.pollWebsocket();
     this.poll();
+    this.redrawTraderQuotes();
+    if(this.getSearchTerm().length)
+      this.search();
   },
   pollWebsocket:function() {
     if(!window.WebSocket)
@@ -211,6 +234,10 @@ var KamadanClient = {
             self.parseMessages([data], true);
           else if(data && data.r)
             self.removeMessages([data.r]);
+          else if(data && data.buy) {
+            window.current_trader_quotes = data;
+            self.redrawTraderQuotes();
+          }
         }
         catch(e) {
           self.error(e);        
@@ -263,6 +290,20 @@ var KamadanClient = {
     this.last_display = this.current_display;
     this.page_wrapper.className = 'display-'+this.current_display;
     this.table_wrapper.className = 'display-'+this.current_display;
+  },
+  redrawTraderQuotes:function() {
+    var quotes = window.current_trader_quotes;
+    var html = '';
+    for(var model_id in GuildWars.materials) {
+      var mat = GuildWars.materials[model_id];
+      for(var quote_model_id in quotes.buy) {
+        if(quote_model_id != model_id) continue;
+        var q = quotes.buy[quote_model_id];
+        var title = mat.name+" = "+q.p+"g\n"+(100000 / q.p).toFixed(2)+" = 100k";
+        html += "<div class='trader-price' style='background-image:url(data:image/png;base64,"+mat.icon+");' title='"+title+"'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+"</div>";
+      }
+    }
+    document.getElementById('trader-prices').innerHTML = html;
   },
   timestamps:function() {
     var rows = document.querySelectorAll('.age');

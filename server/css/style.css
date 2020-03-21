@@ -278,7 +278,7 @@ table,tbody {
     background:#fff;
     border-bottom:1px solid #ccc
 }
-.name{
+.name,.trader-price{
     font-size:13px;
     line-height:18px
 }
@@ -648,4 +648,16 @@ table,tbody {
         margin-top:0
     }
 }
+.trader-price {
+  display:inline-block;
+  background-position:0 50%;
+  background-repeat:no-repeat;
+  background-size:auto 100%;
+  padding-left:20px;
+  margin-right:5px;
+}
+.trader-price:last-child {
+  margin:0;
+}
+
 

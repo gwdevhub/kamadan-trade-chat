@@ -304,6 +304,11 @@ function init(cb) {
         // Don't drop out on error; we'll unlock the stale file later
         KamadanTrade.addTraderPrices(json).then(function(current_trader_quotes) {
           console.log("Trader prices updated");
+          if(!current_trader_quotes)
+            return;
+          global.config.current_trade_prices = current_trader_quotes;
+          pushMessage(global.config.current_trade_prices,true);
+          pushMessage(global.config.current_trade_prices,false);
         }).catch(function(e) {
           console.error(e);
         }).finally(function() {
@@ -342,13 +347,26 @@ function init(cb) {
     app.get('/', function(req,res) {
       res.send(renderFile(__dirname+'/index.html',{req:req}));
     });
+    app.get('/sitemap',function(req,res) {
+      var sitemap = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+      var urls = ['zkey','ecto','bds','conset','kuunavang','vizu'];
+      if(isPreSearing(req)) {
+        urls = ['charr bag','charr kit','black dye','kuunavang','vizu'];
+      }
+      for(var i in urls) {
+        sitemap += '<url><loc>https://'+req.headers.host+'/search/'+encodeURIComponent(urls[i])+'</loc><changefreq>hourly</changefreq></url>';
+      }
+      sitemap += '</urlset>';
+      res.set('Content-Type','application/xml; charset=utf-8');
+      res.send(sitemap);
+    });
     app.get('/search/:term', function(req,res) {
       var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
       Trader.search(req.params.term,0,0).then(function(rows) {
-        res.send(renderFile(__dirname+'/index.html',{req:req,messages:rows}));
+        res.send(renderFile(__dirname+'/index.html',{req:req,messages:rows,search_term:req.params.term}));
       }).catch(function(e) {
         console.error(e);
-        res.send(renderFile(__dirname+'/index.html',{req:req,messages:[]}));
+        res.send(renderFile(__dirname+'/index.html',{req:req,messages:[],search_term:req.params.term}));
       });
     });
     app.get('/s/:term/:from?/:to?', function(req,res) {
@@ -495,6 +513,9 @@ preload().then(function() {
   repeat_script('renew_ssl_certificates.js',864e5);
   repeat_script('run_client.js',10000);
   KamadanTrade.init().then(function() {
+    KamadanTrade.getTraderPrices().then(function(prices) {
+      global.config.current_trade_prices = prices;
+    });
     KamadanTrade.cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
       AscalonTrade.init().then(function() {
         AscalonTrade.cached_message_log = JSON.stringify(AscalonTrade.live_message_log);

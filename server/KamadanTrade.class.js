@@ -15,6 +15,7 @@ function KamadanTrade() {
   this.checked_table_exists = 0;
   this.table_prefix = 'kamadan_';
   this.last_message_by_user = {};
+  this.current_trader_quotes = [];
 }
 KamadanTrade.prototype.housekeeping = function() {
   // Clear down last_message_by_user if over 1 minute old.
@@ -43,7 +44,7 @@ KamadanTrade.prototype.addTraderPrices = function(json) {
       }
       if(!updated_prices.length) {
         console.log("No prices updated");
-        return resolve(current_prices);
+        return resolve(false);
       }
       var sql_args = [];
       var sql_insert = [];
@@ -69,7 +70,7 @@ KamadanTrade.prototype.getTraderPrices = function() {
   var self = this;
   var result = {buy:{},sell:{}};
   return new Promise(function(resolve,reject) {
-    self.db.query("SELECT m,p,t,s FROM trader_prices GROUP BY m,s ORDER BY t DESC").then(function(rows) {
+    self.db.query("SELECT m,p,t,s FROM trader_prices GROUP BY m desc").then(function(rows) {
       for(var i=0;i<rows.length;i++) {
         var res = {p:rows[i].p,t:rows[i].t};
         if(rows[i].s) {
