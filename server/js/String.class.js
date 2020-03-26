@@ -456,6 +456,19 @@ String.prototype.encodeHTML = function() {
 		return '&' + (String.entityTable[c.charCodeAt(0)] || '#'+c.charCodeAt(0)) + ';';
 	});
 }
+String.prototype.copyToClipboard = function() {
+  if(typeof document == 'undefined')
+    return false;
+  var el = document.createElement('textarea');
+  el.value = this;
+  el.setAttribute('readonly', '');
+  el.style.position = 'absolute';
+  el.style.left = '-9999px';
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
+}
 if (!String.prototype.encodeUTF8) {
 	String.prototype.encodeUTF8 = function () {
 		return unescape((this));

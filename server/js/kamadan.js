@@ -140,12 +140,17 @@ var KamadanClient = {
     this.search_input = document.getElementById('search-input');
     this.footer = document.getElementById('footer');
     this.websocket_url = "ws://"+window.location.hostname;
+    this.notify_popup = document.getElementById('notify_popup');
     if(window.location.protocol == 'https:') {
       this.websocket_url = "wss://"+window.location.hostname;
     }
     this.last_search_term = this.getSearchTerm();
     this.search_results = window.search_results || [];
     var self = this;
+    
+    this.notify_popup.addEventListener('click',function(e) {
+      self.onNotifyClose();
+    });
     
     this.current_wrapper.addEventListener('click',function(e) {
       if(e.target.className != 'delete')
@@ -187,7 +192,12 @@ var KamadanClient = {
     },1000);
     document.getElementById('current-wrapper').addEventListener('click',function(e){
       if(e.target && e.target.className == 'name') {
-        self.search('user:'+e.target.textContent);
+        if(e.ctrlKey) {
+          self.search('user:'+e.target.textContent);
+        } else {
+          e.target.textContent.copyToClipboard();
+          self.notify("Sender <b>"+e.target.textContent+"</b> copied to clipboard! (Ctrl + Click to search by this user)","notify-success",5000); 
+        }
       }
    });
     this.setPollInterval(3000);
@@ -525,8 +535,36 @@ var KamadanClient = {
     req.open("GET", "/m");
     req.setRequestHeader('If-None-Match',(this.getLastMessage() || {'t':0}).t);
     req.send();
+  },
+  onNotifyClose:function(){},
+  notify:function(message,type,dismissable) {
+    var notification_popup = document.getElementById('notify_popup');
+    if(!message) {
+      notification_popup.className = '';
+      setTimeout(function() {
+        notification_popup.style.display = 'none';
+      },600);
+      return;
+    }
+    notification_popup.innerHTML = message;
+    notification_popup.style.display = 'block';
+    setTimeout(function() {
+      notification_popup.className = 'notifying '+type;
+    },100);
+    var self = this;
+    self.onNotifyClose = function() { self.notify(false); };
+    if(typeof dismissable == 'boolean') {
+      self.onNotifyClose = dismissable ? function() { self.notify(false); } : function(){};
+    } else if(parseInt(dismissable) != NaN) {
+      if(self.dismissTimeout)
+        clearTimeout(self.dismissTimeout);
+      self.dismissTimeout = setTimeout(function() {
+        self.notify(false);
+      },parseInt(dismissable));
+    }
   }
 };
+//KamadanClient.notify("Message @ "+Date.now(),'notify-success',5000);
 var favicon;
 function getFavicon(){
   if(favicon)

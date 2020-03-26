@@ -659,5 +659,42 @@ table,tbody {
 .trader-price:last-child {
   margin:0;
 }
+#notify_popup {
+  position:fixed;
+  bottom:5vh;
+  left:5vw;
+  right:5vw;
+  border:1px solid #ccc; 
+  border-radius:3px;
+  background:rgba(255,255,255,0.9);
+  box-sizing:border-box;
+  padding:5px 0 5px 5px;
+  overflow:hidden;
+  filter:drop-shadow(0 0 2px rgba(0,0,0,0.2));
+  opacity:0;
+  display:none;
+  height:auto;
+  transition:opacity .2s linear
+}
+#notify_popup.notify-success {
+  background:rgba(220,237,200,0.9);
+  border-color:#8BC34A;
+}
+#notify_popup.notifying {
+  display:block;
+  opacity:1;
+}
+#notify_popup .success-icon {
+  display: block;
+  position:absolute;
+  left:5px;
+  top:50%;
+  margin-top:-0.5em;
+  transform: rotate(45deg);
+  height: 1em;
+  width: 1em;
+  border-bottom: 3px solid #78b13f;
+  border-right: 3px solid #78b13f;
+}
 
 

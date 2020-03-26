@@ -59,6 +59,8 @@ Handlebars.registerHelper("toJson", function(t) {
 });
 function renderFile(file,args) {
   compile_cache[file] = compile_cache[file] || Handlebars.compile(fs.readFileSync(file)+'');
+  if(!ServerConfig.isLocal())
+    compile_cache[file] = Handlebars.compile(fs.readFileSync(file)+'');
   args = args || {};
   args.config = global.config;
   args.is_presearing = isPreSearing(args.req);
