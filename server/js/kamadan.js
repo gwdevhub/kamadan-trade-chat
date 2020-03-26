@@ -394,6 +394,7 @@ var KamadanClient = {
         remove_messages.push(json[i].r);
         delete json[i].r;
       }
+      json[i].m = json[i].m.encodeHTML();
       has_new = this.messages.unshift(json[i]);
     }
     this.removeMessages(remove_messages);
@@ -468,10 +469,12 @@ var KamadanClient = {
       var push_or_unshift = this.search_results.length && this.search_results[0].t > json[0].t ? 'push' : 'unshift';
       if(push_or_unshift == 'unshift') {
         for(var i=json.length - 1; i >= 0;i--) {
+          json[i].m = json[i].m.encodeHTML();
           this.search_results.unshift(json[i]);
         }
       } else {
         for(var i=0; i < json.length;i++) {
+          json[i].m = json[i].m.encodeHTML();
           this.search_results.push(json[i]);
         }
       }
