@@ -48,7 +48,15 @@
     <div id="page">
       <div id="results-header" class="center-row">
         <span id="search-info" class="space"></span>
-        <div id="trader-prices"></div>
+        <div id="trader-prices">
+          <div id="trader-summary"></div>
+          <div id="trader-overlay" selected-tab="common-materials">
+            <button class="trader-table-tab" selected-tab="common-materials">Common Materials</button>
+            <button class="trader-table-tab" selected-tab="rare-materials">Rare Materials</button>
+            <table id="trader-overlay-items"></table>
+            <div class="prices-age">Updated&nbsp;<span id="trader-item-ts" class="age"></span></div>
+          </div>
+        </div>
       </div>
       <div id="listings" class="center-row">
         <div class="fixed-top"><div id="scroll-indicator" title="Show new results"><div id="incoming-count"></div></div></div>

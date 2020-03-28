@@ -49,6 +49,7 @@ button:active{
     padding-bottom:7px;
     background-color:#eee
 }
+button:focus {outline:0;}
 #page{
     display:flex;
     flex-direction:column;
@@ -216,7 +217,7 @@ button:active{
     display:flex;
     border:1px solid #ccc;
     border-radius:4px 4px 0 0;
-    overflow:hidden;
+    /*overflow:hidden;*/
     background:linear-gradient(to bottom,#fff 0,#eeecee 15%,#eeeaee 100%);
     color:#222;
     padding:10px 15px
@@ -278,14 +279,14 @@ table,tbody {
     background:#fff;
     border-bottom:1px solid #ccc
 }
-.name,.trader-price{
+.name, #trader-prices{
     font-size:13px;
     line-height:18px
 }
 .js .name{
     cursor:pointer
 }
-.age{
+.age,.prices-age{
     color:#999;
     font-size:11px;
     line-height:16px
@@ -648,13 +649,18 @@ table,tbody {
         margin-top:0
     }
 }
-.trader-price {
+.trader-price,.trader-overlay-row {
   display:inline-block;
   background-position:0 50%;
   background-repeat:no-repeat;
-  background-size:auto 100%;
-  padding-left:20px;
+  background-size:auto 20px;
+  padding-left:24px;
   margin-right:5px;
+}
+.trader-overlay-row {
+  margin:0;
+  display:block;
+  white-space:nowrap;
 }
 .trader-price:last-child {
   margin:0;
@@ -696,5 +702,98 @@ table,tbody {
   border-bottom: 3px solid #78b13f;
   border-right: 3px solid #78b13f;
 }
-
+#trader-prices {
+  display:inline-block;
+  width:auto;
+  overflow:visible;
+  position:relative;
+  z-index:1;
+  line-height:1.4em;
+}
+#trader-summary {
+  display:inline-block;
+  border-radius:5px;
+  border:1px solid transparent;
+  padding:2px;
+  cursor:pointer;
+}
+#trader-summary:hover {
+  border-color:#ccc;
+}
+#trader-overlay {
+  display:none;
+  position:absolute;
+  background:#eeeaee;
+  border-radius:0 0 5px 5px;
+  border:1px solid #ccc;
+  border-width: 0 1px 1px 1px;
+  right:0;
+  width:auto;
+  height:auto;
+  margin-top:10px;
+}
+.trader-overlay-row {
+  margin:2px;
+}
+#trader-prices.showing-overlay #trader-summary {
+  box-shadow:inset 0 0 2px #ccc;
+  border-color:#ccc;
+}
+#trader-prices.showing-overlay #trader-overlay {
+  display:block;
+  box-shadow:3px 3px 5px 0 rgba(0,0,0,0.2);
+}
+#trader-overlay-items td {
+  white-space:nowrap;
+  line-height:1.6em;
+}
+#trader-overlay-items tr:hover {
+  font-weight:bold;
+}
+#trader-overlay-items td:first-child {
+  padding-left:1.6em;
+  background-repeat:no-repeat;
+  background-position:1px 50%;
+  background-size:auto 20px;
+  min-width:180px;
+}
+#trader-overlay-items td:last-child {
+  text-align:right;
+  padding-right:5px;
+  min-width:160px;
+}
+.prices-age {
+  text-align:right;
+  padding:10px 5px 0 0;
+}
+.prices-age .age {
+  display:inline;
+}
+.trader-table-tab {
+  display:inline-block;
+  width:49%;
+  border:none;
+  text-align:center;
+  padding:5px 0;
+  cursor:pointer;
+  border-radius:3px 3px 0 0;
+  color:#383838;
+}
+.trader-table-tab:hover {
+  font-weight:bold;
+}
+#trader-overlay[selected-tab="common-materials"] .trader-table-tab[selected-tab="common-materials"],
+#trader-overlay[selected-tab="rare-materials"] .trader-table-tab[selected-tab="rare-materials"] {
+  font-weight:bold;
+  background:#eeeaee;
+  color:#000;
+}
+#trader-overlay[selected-tab="common-materials"] .rare-material-row,
+#trader-overlay[selected-tab="rare-materials"] .common-material-row {
+  display:none;
+}
+ #trader-overlay button:active {
+  padding:5px 0;
+  background:#eeeaee;
+}
 
