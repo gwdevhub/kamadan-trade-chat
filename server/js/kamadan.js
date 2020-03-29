@@ -415,6 +415,7 @@ var KamadanClient = {
     var quotes = window.current_trader_quotes;
     var html = '';
     var overlay_html = '';
+    var latest_timestamp = 0;
     for(var i in common_materials_sorted) {
       var model_id = common_materials_sorted[i];
       var mat = GuildWars.common_materials[model_id];
@@ -423,7 +424,9 @@ var KamadanClient = {
         if(quote_model_id != model_id) continue;
         var q = quotes.buy[quote_model_id];
         var name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
-        overlay_html += "<tr class='common-material-row'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+abbrPrice(q.p)+" (100k = "+abbrAmount(100000 / q.p,2)+")</td></tr>";
+        var price_per = q.p / (mat.per ? mat.per : 1);
+        latest_timestamp = Math.max(latest_timestamp,q.t);
+        overlay_html += "<tr class='common-material-row'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+abbrPrice(q.p)+" (100k = "+abbrAmount(100000 / price_per,2)+")</td></tr>";
         if(price_quote_summary_items[model_id]) {
           html += "<div class='trader-price' style='background-image:url("+icon+");'>"+abbrPrice(q.p)+"</div>";
         }
@@ -437,14 +440,16 @@ var KamadanClient = {
         if(quote_model_id != model_id) continue;
         var q = quotes.buy[quote_model_id];
         var name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
+        latest_timestamp = Math.max(latest_timestamp,q.t);
         overlay_html += "<tr class='rare-material-row'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+" (100k = "+(100000 / q.p).toFixed(2)+")</td></tr>";
         if(price_quote_summary_items[model_id]) {
           html += "<div class='trader-price' style='background-image:url("+icon+");'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+"</div>";
         }
       }
     }
+    console.log(latest_timestamp);
     window.current_trader_quotes.updated_at = window.current_trader_quotes.updated_at || Date.now();
-    document.getElementById('trader-item-ts').setAttribute('data-timestamp',window.current_trader_quotes.updated_at);
+    document.getElementById('trader-item-ts').setAttribute('data-timestamp',latest_timestamp*1000);
     document.getElementById('trader-summary').innerHTML = html;
     document.getElementById('trader-overlay-items').innerHTML = overlay_html;
   },

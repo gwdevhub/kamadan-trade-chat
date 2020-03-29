@@ -429,6 +429,9 @@ table,tbody {
         max-width:1200px
     }
 }
+#trader-overlay {
+  margin-top:11px;
+}
 @media screen and (max-width:600px){
     #home-text{
         display:none
@@ -438,6 +441,9 @@ table,tbody {
         background:#ffe;
         font-size:12px;
         padding:4px 8px
+    }
+    #trader-overlay {
+      margin-top:5px;
     }
     #connection-indicator{
         width:10px;
@@ -730,7 +736,6 @@ table,tbody {
   right:0;
   width:auto;
   height:auto;
-  margin-top:10px;
 }
 .trader-overlay-row {
   margin:2px;
@@ -738,6 +743,7 @@ table,tbody {
 #trader-prices.showing-overlay #trader-summary {
   box-shadow:inset 0 0 2px #ccc;
   border-color:#ccc;
+  background:rgba(99,99,99,0.1);
 }
 #trader-prices.showing-overlay #trader-overlay {
   display:block;
