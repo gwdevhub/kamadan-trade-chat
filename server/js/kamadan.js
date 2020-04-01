@@ -559,6 +559,12 @@ var KamadanClient = {
       var checkMessage = function(msg) {
         var toLower = msg.m.toLowerCase();
         for(var i=0;i<search_words.length;i++) {
+          switch(search_words[i][0]) {
+            case '!':
+              if(toLower.indexOf(search_words[i].substr(1)) != -1)
+                return false; // Matched excluded word
+            break;
+          }
           if(toLower.indexOf(search_words[i]) == -1)
             return false;
         }

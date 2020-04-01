@@ -220,11 +220,30 @@ KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
     } else {
       // Split string by spaces
       var keywords = term.split(' ');
-      where_clause = " WHERE m LIKE ? ";
-      args = ['%'+keywords[0]+'%']
-      for(var i=1;i<keywords.length;i++) {
-        where_clause += "AND m LIKE ? ";
-        args.push('%'+keywords[i]+'%');
+      var incwords = [];
+      var exwords = [];
+      for(var i=0;i<keywords.length;i++) {
+        switch(keywords[i][0]) {
+          case '!':
+            if(keywords[i].length > 1)
+              exwords.push(keywords[i].substr(1));
+          break;
+          default:
+            incwords.push(keywords[i]);
+          break;
+        }
+      }
+      // Include these words...
+      for(var i=0;i<incwords.length;i++) {
+        where_clause += where_clause.length ? " AND" : " WHERE";
+        where_clause+= " m LIKE ? ";
+        args.push('%'+incwords[i]+'%');
+      }
+      // ...but exclude these ones.
+      for(var i=0;i<exwords.length;i++) {
+        where_clause += where_clause.length ? " AND" : " WHERE";
+        where_clause+= " m NOT LIKE ? ";
+        args.push('%'+exwords[i]+'%');
       }
     }
     var rows_final = [];
