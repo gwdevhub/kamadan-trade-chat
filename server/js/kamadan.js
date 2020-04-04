@@ -1,4 +1,11 @@
 var GuildWars = {
+  getItemName:function(model_id) {
+    if(this.common_materials[model_id])
+      return this.common_materials[model_id].name;
+    if(this.rare_materials[model_id])
+      return this.rare_materials[model_id].name;
+    return "Unknown Item";
+  },
   common_materials:{
     // Common mats
     921:{name:"Bones",per:10},
@@ -108,6 +115,13 @@ var KamadanClient = {
     console.error.apply(console,arguments);
   },
   max_messages:100,
+  pricing_history:{
+    model_id:930,
+    chart:null,
+    from:(new Date()).modify('-30 days'),
+    to:new Date(),
+    scale:(36e5) / 1000 // Hourly
+  },
   last_search_term:'',
   message_alert_checks:{},
   current_display:'live',
@@ -139,6 +153,7 @@ var KamadanClient = {
     this.search(this.last_search_term,earliest_msg.t);
   },
   search:function(term,offset) {
+    this.hidePricingHistory();
     if(term)
       this.search_input.value = term;
     term = this.getSearchTerm();
@@ -217,6 +232,7 @@ var KamadanClient = {
     this.results_header = document.getElementById('results-header');
     this.table_wrapper = this.current_wrapper.parentElement;
     this.search_input = document.getElementById('search-input');
+    this.listings_div = document.getElementById('listings');
     this.footer = document.getElementById('footer');
     this.websocket_url = "ws://"+window.location.hostname;
     this.notify_popup = document.getElementById('notify_popup');
@@ -249,12 +265,24 @@ var KamadanClient = {
     document.getElementById('trader-summary').parentElement.addEventListener('click',function(e) {
       e.stopPropagation();
     });
+    document.getElementById('reset-zoom').addEventListener('click',function(e) {
+      self.pricing_history.chart.resetZoom();
+      this.style.display = 'none';
+    });
     var tabs = document.getElementsByClassName('trader-table-tab');
     for(var i=0;i<tabs.length;i++) {
       tabs[i].addEventListener('click',function(e) {
         this.parentElement.setAttribute('selected-tab',this.getAttribute('selected-tab'));
       });
     }
+    document.getElementById('trader-overlay-items').addEventListener('click',function(e) {
+      var model_id;
+      for(var i=0;i<e.path.length && !model_id;i++) {
+        model_id = e.path[i].getAttribute('model_id');
+      }
+      if(model_id)
+        self.showPricingHistory(model_id);
+    });
     document.getElementById('delete_message_dismiss').addEventListener('click',function(e) {
       document.getElementById('delete_message_modal').style.display = 'none'
     });
@@ -264,6 +292,7 @@ var KamadanClient = {
       e.preventDefault();
       window.scrollTo(0,0);
       self.clearSearch();
+      self.hidePricingHistory();
     });
     this.loadMessages();
     window.addEventListener("beforeunload", function(event) {
@@ -301,6 +330,9 @@ var KamadanClient = {
     this.redrawTraderQuotes();
     if(this.getSearchTerm().length)
       this.search();
+    if(/showing-prices/.test(this.listings_div.className)) {
+      this.showPricingHistory();
+    }
   },
   pollWebsocket:function() {
     if(!window.WebSocket)
@@ -426,7 +458,7 @@ var KamadanClient = {
         var name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
         var price_per = q.p / (mat.per ? mat.per : 1);
         latest_timestamp = Math.max(latest_timestamp,q.t);
-        overlay_html += "<tr class='common-material-row'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+abbrPrice(q.p)+" (100k = "+abbrAmount(100000 / price_per,2)+")</td></tr>";
+        overlay_html += "<tr class='common-material-row' model_id='"+model_id+"'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+abbrPrice(q.p)+" (100k = "+abbrAmount(100000 / price_per,2)+")</td></tr>";
         if(price_quote_summary_items[model_id]) {
           html += "<div class='trader-price' style='background-image:url("+icon+");'>"+abbrPrice(q.p)+"</div>";
         }
@@ -441,7 +473,7 @@ var KamadanClient = {
         var q = quotes.buy[quote_model_id];
         var name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
         latest_timestamp = Math.max(latest_timestamp,q.t);
-        overlay_html += "<tr class='rare-material-row'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+" (100k = "+(100000 / q.p).toFixed(2)+")</td></tr>";
+        overlay_html += "<tr class='rare-material-row' model_id='"+model_id+"'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+" (100k = "+(100000 / q.p).toFixed(2)+")</td></tr>";
         if(price_quote_summary_items[model_id]) {
           html += "<div class='trader-price' style='background-image:url("+icon+");'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+"</div>";
         }
@@ -590,6 +622,138 @@ var KamadanClient = {
       this.redrawMessages();
       this.saveMessages(); 
     }
+  },
+  showPricingHistory:function(model_id) {
+    this.listings_div.classList.add('showing-prices');
+    document.getElementById('reset-zoom').style.display = 'none';
+    if(model_id)
+      this.pricing_history.model_id = model_id;
+    var self = this;
+    this.getPricingHistory().then(function(data) {
+      console.log(data);
+      var dataPoints = {};
+      var bgCol = 'rgba(252, 247, 200,0.3)';
+      var dragCol = 'rgba(108,82,34,0.5)';
+      var dragLine = '#3c2d11';
+      var lineCol = '#d1c190';
+      for(var i=0;i<data.length;i++) {
+        dataPoints[data[i].m] = dataPoints[data[i].m] || {
+            "lineTension":0,
+            "type":"line",
+            "label":GuildWars.getItemName(data[i].m),
+            fillColor: bgCol, 
+            backgroundColor:bgCol,
+            highlightFill: bgCol,
+            strokeColor:lineCol,
+            borderColor:lineCol,
+            highlightStroke: lineCol,
+            "data":[]
+          };
+        dataPoints[data[i].m].data.push({x:data[i].t,y:data[i].p});
+      }
+      var dataSets = [];
+      for(var i in dataPoints) {
+        dataPoints[i].dataPoints = dataPoints[i].data;
+        dataSets.push(dataPoints[i]);
+      }
+      var chart_args = {
+        type:'line',
+        zoomable:true,
+        responsive:true,
+        maintainAspectRatio:false,
+        data:{
+          datasets:dataSets
+        },
+        options: {
+          responsive:true,
+        maintainAspectRatio:false,
+          tooltips: {
+            callbacks: {
+              title:function(tooltipItem,data) {
+                return (new Date(tooltipItem[0].xLabel * 1000)).niceDateTime();
+              }
+            }
+          },
+          scales: {
+              xAxes: [{
+                type: 'linear',
+                position: 'bottom',
+                ticks: {
+                  callback: function(value, index, values) {
+                    return (new Date(value * 1000)).format('So MMM HH:ii');
+                  },
+                  suggestedMax:Math.floor(Date.now() / 1000)
+                }
+              }],
+             yAxes: [{
+                ticks: {
+                    suggestedMin:50,
+                    suggestedMax:5000,
+                    stepSize:500
+                }
+            }]
+          },
+          plugins: {
+            zoom: {
+              pan: {enabled: false},
+              zoom: {
+                enabled: true,
+                mode: 'x',
+                drag: {
+                  borderColor: dragLine,
+                  borderWidth: 1,
+                  backgroundColor: dragCol,
+                  animationDuration: 3
+                },
+                onZoomComplete: function() {
+                  document.getElementById('reset-zoom').style.display = 'block';
+                }
+              }
+            }
+          }
+        }
+      };
+      var canvas = document.getElementById('prices-graph-canvas');
+      canvas.height = canvas.parentElement.offsetHeight;
+      canvas.width = canvas.parentElement.offsetWidth;
+      if(self.pricing_history.chart) {
+        self.pricing_history.chart.data.datasets = dataSets;
+        self.pricing_history.chart.update();
+      } else {
+        self.pricing_history.chart = new Chart('prices-graph-canvas', chart_args);
+      }
+    }).catch(function(e) {
+      self.error(e);
+      self.hidePricingHistory();
+    });
+  },
+  hidePricingHistory:function() {
+    this.listings_div.classList.remove('showing-prices');
+  },
+  getPricingHistory:function() {
+    var self = this;
+    if(!self.pricing_history.model_id)
+      return Promise.reject(new Error("Invalid model_id"));
+    return new Promise(function(resolve,reject) {
+      var req = new XMLHttpRequest();
+      req.addEventListener("load", function() {
+        if(!this.response.length)
+          return resolve([]);
+        var result = null;
+        try {
+          result = JSON.parse(this.response);
+        } catch(e) {
+          return reject(e);
+        }
+        return resolve(result);
+      });
+      req.addEventListener("error",function() {
+        reject(new Error("Network failure"));
+      });
+      req.open("GET", "/pricing_history/"+self.pricing_history.model_id+"/"+self.pricing_history.from.getTime()+"/"+self.pricing_history.to.getTime());
+      req.send();
+    });
+
   },
   loadMessages:function() {
     if(!window.localStorage) 

@@ -371,6 +371,15 @@ function init(cb) {
         res.send(renderFile(__dirname+'/index.html',{req:req,messages:[],search_term:req.params.term}));
       });
     });
+    app.get('/pricing_history/:model_id/:from/:to', function(req,res) {
+      var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+      Trader.getPricingHistory(req.params.model_id,req.params.from,req.params.to).then(function(rows) {
+        res.json(rows);
+      }).catch(function(e) {
+        console.error(e);
+        res.json([]);
+      });
+    });
     app.get('/s/:term/:from?/:to?', function(req,res) {
       var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
       Trader.search(req.params.term,req.params.from,req.params.to).then(function(rows) {

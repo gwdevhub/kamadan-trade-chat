@@ -54,13 +54,13 @@
             <button class="trader-table-tab" selected-tab="common-materials">Common Materials</button>
             <button class="trader-table-tab" selected-tab="rare-materials">Rare Materials</button>
             <table id="trader-overlay-items"></table>
+            <div class="prices-info">Click an item to view price history.</div>
             <div class="prices-age">Updated&nbsp;<span id="trader-item-ts" class="age"></span></div>
           </div>
         </div>
       </div>
-      <div id="listings" class="center-row">
-        <div class="fixed-top"><div id="scroll-indicator" title="Show new results"><div id="incoming-count"></div></div></div>
-        <table>
+      <div id="listings" class="center-row showing-prices">
+        <table id="live-trade-feed">
         <tbody id="current-wrapper">
         {{#each messages}}
           <tr class="row unanimated" id="{{this.t}}">
@@ -72,7 +72,11 @@
         {{/each}}
         </tbody>
         </table>
+        <div id="prices-graph-container">
+          <canvas id="prices-graph-canvas" width="100%" height="100%"></canvas>
+          <button id="reset-zoom">Reset Zoom</button>
         </div>
+      </div>
       <div id="footer">
         <div class="container">
           <div id="disclaimer">
@@ -105,14 +109,30 @@
         window.current_trader_quotes = {{{toJson this}}};
       {{/with}}
       window.addEventListener('load', function() {
-        var scripts = [
+        var pre_scripts = [
           '/js'+window.deployment_date+'/Date.class.js',
           '/js'+window.deployment_date+'/String.class.js',
+          '/js'+window.deployment_date+'/chartjs.with.zoom.min.js'
+        ];
+        
+        var post_scripts = [
           '/js'+window.deployment_date+'/kamadan.js'
         ];
-        for(var i in scripts) {
+        var done=0;
+        var script_loaded = function() {
+          done++;
+          if(done != pre_scripts.length)
+            return;
+          for(var i in post_scripts) {
+            var s = document.createElement('script');
+            s.src = post_scripts[i];
+            document.body.appendChild(s);
+          }
+        };
+        for(var i in pre_scripts) {
           var s = document.createElement('script');
-          s.src = scripts[i];
+          s.onload = script_loaded;
+          s.src = pre_scripts[i];
           document.body.appendChild(s);
         }
         var home_icon = document.getElementById('home-icon');

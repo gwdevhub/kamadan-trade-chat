@@ -85,6 +85,19 @@ KamadanTrade.prototype.getTraderPrices = function() {
   });
   
 }
+KamadanTrade.prototype.getPricingHistory = function(model_id,from,to) {
+  var self = this;
+  var result = [];
+  return new Promise(function(resolve,reject) {
+    var args = [model_id,from.substr(0,10),to.substr(0,10)];
+    self.db.query("SELECT m,p,t,s FROM trader_prices WHERE m = ? AND t >= ? and t <= ? ORDER BY t DESC",args).then(function(rows) {
+      result = rows;
+    }).finally(function() {
+      return resolve(result);
+    });
+  });
+}
+
 KamadanTrade.prototype.init = function() {
   var self = this;
   if(this.initted)

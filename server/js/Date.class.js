@@ -155,7 +155,7 @@ Date.prototype.getWeekOfMonth = function(exact) {
 	return week === weeksInMonth ? index + 5 : week;
 };
 Date.prototype.niceDate = function() {
-	return this.format('Do MMM YYYY');
+	return this.format('So MMM YYYY');
 }
 Date.prototype.isToday = function() {
 	return this.format('Ymd') == (new Date()).format('Ymd');

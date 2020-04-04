@@ -27,6 +27,19 @@ table,tbody{
   border-top:0;
   border-bottom:0;
 }
+#listings #prices-graph-container {
+  position:relative;
+  display:none;
+  min-height:600px;
+  max-height:80vh;
+}
+#listings.showing-prices #prices-graph-container {
+  display:block;
+  position:relative;
+}
+#listings.showing-prices #live-trade-feed {
+  display:none;
+}
 #listings table.display-search {
   height:auto;
 }
@@ -45,9 +58,9 @@ button:hover{
     background-color:#fefeff
 }
 button:active{
-    padding-top:9px;
-    padding-bottom:7px;
-    background-color:#eee
+  padding-top:9px;
+  padding-bottom:7px;
+  background-color:#eee
 }
 button:focus {outline:0;}
 #page{
@@ -213,7 +226,7 @@ button:focus {outline:0;}
     overflow:hidden;
     position:relative
 }
-#results-header{
+#results-header, #reset-zoom {
     display:flex;
     border:1px solid #ccc;
     border-radius:4px 4px 0 0;
@@ -221,6 +234,15 @@ button:focus {outline:0;}
     background:linear-gradient(to bottom,#fff 0,#eeecee 15%,#eeeaee 100%);
     color:#222;
     padding:10px 15px
+}
+#reset-zoom {
+  position:absolute;
+  top:5px;
+  right:0;
+  width:auto;
+  height:auto;
+  border-radius:4px;
+  padding:2px 4px;
 }
 #connection-indicator{
     margin-left:5px;
@@ -286,7 +308,7 @@ table,tbody {
 .js .name{
     cursor:pointer
 }
-.age,.prices-age{
+.age,.prices-age, .prices-info{
     color:#999;
     font-size:11px;
     line-height:16px
@@ -752,6 +774,7 @@ table,tbody {
 #trader-overlay-items td {
   white-space:nowrap;
   line-height:1.6em;
+  cursor:pointer;
 }
 #trader-overlay-items tr:hover {
   font-weight:bold;
@@ -769,8 +792,17 @@ table,tbody {
   min-width:160px;
 }
 .prices-age {
+  position:absolute;
   text-align:right;
+  bottom:0;
+  right:0;
+  width:50%;
   padding:10px 5px 0 0;
+}
+.prices-info {
+  position:relative;
+  width:50%;
+  padding:10px 0 0 5px;
 }
 .prices-age .age {
   display:inline;
