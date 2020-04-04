@@ -277,6 +277,7 @@ var KamadanClient = {
     }
     document.getElementById('trader-overlay-items').addEventListener('click',function(e) {
       var model_id;
+      e.path = e.path || e.composedPath();
       for(var i=0;i<e.path.length && !model_id;i++) {
         model_id = e.path[i].getAttribute('model_id');
       }
