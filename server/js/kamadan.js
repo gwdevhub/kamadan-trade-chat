@@ -639,40 +639,60 @@ var KamadanClient = {
       var lineCol = '#d1c190';
       for(var i=0;i<data.length;i++) {
         dataPoints[data[i].m] = dataPoints[data[i].m] || {
-            lineTension:0,
-            type:"line",
-            steppedLine:"before",
-            label:GuildWars.getItemName(data[i].m),
-            fillColor: bgCol, 
-            backgroundColor:bgCol,
-            highlightFill: bgCol,
-            strokeColor:lineCol,
-            borderColor:lineCol,
-            highlightStroke: lineCol,
-            data:[]
-          };
+          lineTension:0,
+          type:"line",
+          steppedLine:"before",
+          label:GuildWars.getItemName(data[i].m),
+          fillColor: bgCol, 
+          backgroundColor:bgCol,
+          highlightFill: bgCol,
+          strokeColor:lineCol,
+          borderColor:lineCol,
+          highlightStroke: lineCol,
+          pointHitRadius:5,
+          data:[]
+        };
         dataPoints[data[i].m].data.push({x:data[i].t,y:data[i].p});
       }
       var dataSets = [];
+      var suggestedMax = Math.floor(Date.now() / 1000);
+      var suggestedMin = Math.floor(self.pricing_history.from.getTime() / 1000);
       for(var i in dataPoints) {
+        if(dataPoints[i].data[0].x < suggestedMax)
+          dataPoints[i].data.unshift({x:suggestedMax,y:dataPoints[i].data[0].y});
+        if(dataPoints[i].data[dataPoints[i].data.length - 1].x > suggestedMin)
+          dataPoints[i].data.push({x:suggestedMin,y:dataPoints[i].data[dataPoints[i].data.length - 1].y});
         dataPoints[i].dataPoints = dataPoints[i].data;
         dataSets.push(dataPoints[i]);
       }
       var chart_args = {
         type:'line',
-        zoomable:true,
-        responsive:true,
-        maintainAspectRatio:false,
         data:{
           datasets:dataSets
         },
         options: {
           responsive:true,
-        maintainAspectRatio:false,
+          maintainAspectRatio:false,
           tooltips: {
             callbacks: {
               title:function(tooltipItem,data) {
                 return (new Date(tooltipItem[0].xLabel * 1000)).niceDateTime();
+              },
+              label:function(tooltipItem,data) {
+                return data.datasets[tooltipItem.datasetIndex].label+': '+tooltipItem.yLabel+'g';
+              },
+              afterLabel:function(tooltipItem,data) {
+                if(tooltipItem.index == data.datasets[tooltipItem.datasetIndex].data.length - 1)
+                  return '';
+                var prev = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index+1];
+                if(prev.y == tooltipItem.yLabel)
+                  return '';
+                var prevTime = new Date(prev.x * 1000);
+                var thisTime = new Date(tooltipItem.xLabel * 1000);
+                var diff = thisTime.diff(prevTime);
+                var unit = diff.bestFitUnit();
+                var val = diff[unit+'s']();
+                return "Was "+prev.y+"g for "+val+" "+unit+(val > 1 ? 's' : '');
               }
             }
           },
@@ -682,9 +702,11 @@ var KamadanClient = {
                 position: 'bottom',
                 ticks: {
                   callback: function(value, index, values) {
-                    return (new Date(value * 1000)).format('So MMM HH:ii');
+                    return (new Date(value * 1000)).format('So MMM');
                   },
-                  suggestedMax:Math.floor(Date.now() / 1000)
+                  max:suggestedMax,
+                  min:suggestedMin,
+                  stepSize:Date.hour * 24 / 1000
                 }
               }],
              yAxes: [{

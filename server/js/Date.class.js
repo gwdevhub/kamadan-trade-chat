@@ -1,5 +1,10 @@
 Date.days_of_the_week = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 Date.months_of_the_year = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+Date.second = 1e3;
+Date.minute = 6e4;
+Date.hour = 36e5;
+Date.day = 864e5;
+Date.month = Date.day * 30;
 Date.isValidDate = function(d) {
 	return (typeof d['getTime'] == 'function' && !isNaN(d.getTime()));
 }
@@ -162,7 +167,7 @@ Date.prototype.isToday = function() {
 }
 Date.prototype.niceDateTime = function() {
 	var local = this.toLocalDate();
-	return local.format('Do MMM YYYY HH:mm');
+	return local.format('So MMM YYYY HH:mm');
 }
 Date.prototype.toLocalDate = function() {
 	var user_offset = (new Date()).getTimezoneOffset();
@@ -172,7 +177,7 @@ Date.prototype.toLocalDate = function() {
 	return this;  
 }
 // e.g. 3 hours ago
-Date.prototype.relativeTime = function(unit, date_to_compare) {
+Date.prototype.diff = function(date_to_compare) {
   var date = date_to_compare || new Date();
   const second = 1e3;
   const minute = 6e4;
@@ -199,36 +204,35 @@ Date.prototype.relativeTime = function(unit, date_to_compare) {
     },
     seconds:function() {
       return Math.abs(this.round((date.getStartOf("second") - self.getStartOf("second")) / second));
+    },
+    bestFitUnit:function() {
+      var ms_diff = Math.abs(this.ms);
+      if(ms_diff < second)
+        return "ms";
+      else if(ms_diff < minute)
+        return "second";
+      else if(ms_diff < hour)
+        return "minute";
+      else if(ms_diff < day)
+        return "hour";
+      else if(ms_diff < month)
+        return "day";
+      else if(ms_diff < (month * 12))
+        return "month";
+      else
+        return "year";
     }
   };
   diff.round = Math[diff.ms > 0 ? "floor" : "ceil"];
+  return diff;
+}
+Date.prototype.relativeTime = function(unit, date_to_compare) {
+  var diff = this.diff(date_to_compare);
   
-  switch(unit) {
-    case "year":
-    case "month":
-    case "day":
-    case "hour":
-    case "minute":
-    case "second":
-      break;
-    default:
-      var ms_diff = Math.abs(diff.ms);
-      if(ms_diff < second)
-        return "Just now";
-      else if(ms_diff < minute)
-        unit = "second";
-      else if(ms_diff < hour)
-        unit = "minute";
-      else if(ms_diff < day)
-        unit = "hour";
-      else if(ms_diff < month)
-        unit = "day";
-      else if(ms_diff < (month * 12))
-        unit = "month";
-      else
-        unit = "year";
-      break;
-  }
+  if(!unit || !diff[unit])
+    unit = diff.bestFitUnit();
+  if(unit == 'ms')
+    return "Just now";
   var val = diff[unit+'s']();
   return val+" "+unit+(val > 1 ? "s" : "")+" ago";
 }
