@@ -639,16 +639,17 @@ var KamadanClient = {
       var lineCol = '#d1c190';
       for(var i=0;i<data.length;i++) {
         dataPoints[data[i].m] = dataPoints[data[i].m] || {
-            "lineTension":0,
-            "type":"line",
-            "label":GuildWars.getItemName(data[i].m),
+            lineTension:0,
+            type:"line",
+            steppedLine:"before",
+            label:GuildWars.getItemName(data[i].m),
             fillColor: bgCol, 
             backgroundColor:bgCol,
             highlightFill: bgCol,
             strokeColor:lineCol,
             borderColor:lineCol,
             highlightStroke: lineCol,
-            "data":[]
+            data:[]
           };
         dataPoints[data[i].m].data.push({x:data[i].t,y:data[i].p});
       }
@@ -689,7 +690,6 @@ var KamadanClient = {
              yAxes: [{
                 ticks: {
                     suggestedMin:50,
-                    suggestedMax:5000,
                     stepSize:500
                 }
             }]
