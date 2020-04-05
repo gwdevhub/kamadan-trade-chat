@@ -641,7 +641,7 @@ var KamadanClient = {
         dataPoints[data[i].m] = dataPoints[data[i].m] || {
           lineTension:0,
           type:"line",
-          steppedLine:"before",
+          steppedLine:"after",
           label:GuildWars.getItemName(data[i].m),
           fillColor: bgCol, 
           backgroundColor:bgCol,
