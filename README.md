@@ -1,4 +1,4 @@
-# Kamadan Trade Chat
+# Kamadan Trade Chat - https://kamadan.gwtoolbox.com
 Client/Server solution to read in trade messages and provide a web front-end. Uses GWCA to interface with the Guild Wars client, and NodeJS to provide a web facing server.
 
 ## Client Setup
