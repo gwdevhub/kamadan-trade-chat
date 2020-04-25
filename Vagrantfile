@@ -98,12 +98,30 @@ Machines = {
 	},
   'ManagedServers' => {
 		'staging' => {
-			'ip_address' => '18.202.80.59',
+			'ip_address' => 'kamadan.gwtoolbox.com',
 			'server_config' => cloud_config.merge({
 				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
         'is_cloud'=>1,
         'ssl_email'=>'jon@3vcloud.uk',
         'ssl_domains' => ['kamadan.gwtoolbox.com','ascalon.gwtoolbox.com']
+			}),
+			'code_to_provision' => 'local',
+			#'rsync_path' => '~/local/bin/rsync',	# Custom rsync binary on server.
+			'deployment_script'=>{
+        'path' => 'deploy.sh',
+        'args' => [server_config['db_user'], server_config['db_pass'], server_config['db_schema']]
+      },
+			'prompt_user_before_provision' => 0,
+			'ssh_username' => 'ubuntu',
+			'os' => 'linux'
+		},
+    'nano' => {
+			'ip_address' => '63.35.250.60',
+			'server_config' => cloud_config.merge({
+				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
+        #'ssl_email'=>'jon@3vcloud.uk',
+        #'ssl_domains' => ['kamadan.gwtoolbox.com','ascalon.gwtoolbox.com'],
+        'is_cloud'=>1
 			}),
 			'code_to_provision' => 'local',
 			#'rsync_path' => '~/local/bin/rsync',	# Custom rsync binary on server.
