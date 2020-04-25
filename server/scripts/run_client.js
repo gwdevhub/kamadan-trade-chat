@@ -8,7 +8,7 @@ var exec = exec || require('child_process').exec;
 var ServerConfig = require(__dirname+'/../../kamadan-trade-client/ServerConfig.class.js');
 
 var kamadan_gw_login = ServerConfig.get('gw_kamadan_login');
-if(kamadan_gw_login) {
+if(kamadan_gw_login && kamadan_gw_login.email && kamadan_gw_login.email.trim().length) {
   exec('ps -elf | grep "[-]email \"'+kamadan_gw_login.email+'\""',function(a,stdout,c) {
     if(stdout.indexOf('-email') != -1)
       return;// console.log("Guild Wars client already running!\n"+stdout);
@@ -21,7 +21,7 @@ if(kamadan_gw_login) {
   console.error("Failed to get gw_kamadan_login from config");
 }
 var ascalon_gw_login = ServerConfig.get('gw_ascalon_login');
-if(ascalon_gw_login) {
+if(ascalon_gw_login && ascalon_gw_login.email && ascalon_gw_login.email.trim().length) {
   exec('ps -elf | grep "[-]email \"'+ascalon_gw_login.email+'\""',function(a,stdout,c) {
     if(stdout.indexOf('-email') != -1)
       return;// console.log("Guild Wars client already running!\n"+stdout);

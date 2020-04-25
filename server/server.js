@@ -187,7 +187,7 @@ function pushMessage(added_message,is_pre) {
         sent_to++;
       });
     }
-    console.log("Sent to "+sent_to+" connected sockets");
+    //console.log("Sent to "+sent_to+" connected sockets");
   }
 }
 
@@ -251,8 +251,9 @@ function init(cb) {
 		// Deployment date is in format %Y%m%d%H%M%S and is found from ServerConfig.get('deployment_date')
 		let two_week_cache = expressCacheOptions(14*24*60*60*1000);
     let two_year_cache = expressCacheOptions(2*365*24*60*60*1000);
-		app.use('/.well-known/pki-validation',express.static(__dirname + '/.well-known/pki-validation'));
-    app.use('/.well-known/acme-challenge',express.static(__dirname + '/.well-known/acme-challenge'));
+    app.use(/^\/\.well-known/, express.static(__dirname + '/.well-known'));
+		//app.use('/.well-known/pki-validation',express.static(__dirname + '/.well-known/pki-validation'));
+    //app.use('/.well-known/acme-challenge',express.static(__dirname + '/.well-known/acme-challenge'));
 		app.use(/^\/images([0-9]{14})?/,express.static(__dirname + '/images',two_year_cache));
 		app.use(/^\/css([0-9]{14})?/,express.static(__dirname + '/css',two_year_cache));
 		app.use(/^\/js([0-9]{14})?/,express.static(__dirname + '/js',two_year_cache));

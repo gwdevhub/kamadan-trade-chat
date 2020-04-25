@@ -33,7 +33,7 @@ if(typeof ServerConfig == 'undefined') {
   require("module").Module._initPaths();
   ServerConfig = require(__dirname+'/../ServerConfig.class.js');
 }
-if(ServerConfig.isLocal() && false)
+if(ServerConfig.isLocal())
   return Promise.reject("Server is local - not going to mess with SSL certificates");
 
 if(!global.ssl_info) {
@@ -68,8 +68,8 @@ if(!global.ssl_info) {
     }
   }
 }
-if(!global.ssl_info.enabled) {
-  return Promise.reject("No SSL enabled.\nThis server won't be running in SSL.");
+if(!(global.ssl_info.ssl_email || '').trim().length) {
+  return Promise.reject("No SSL email.\nThis server won't be running in SSL.");
 }
 
 var ssl_domain = global.ssl_info.ssl_domain;
@@ -111,7 +111,7 @@ function getSSLForDomain(ssl_domain) {
       return resolve();
     }
     log("Renewing certificate - this should restart nodejs on completion");
-    exec('certbot certonly --webroot -w '+__dirname+' -d '+domain+' -n --agree-tos --force-renewal --email '+ssl_email+'\
+    exec('certbot certonly --webroot -w '+__dirname+' -d '+ssl_domain+' -n --agree-tos --force-renewal --email '+ssl_email+'\
       && chmod -R 755 /etc/letsencrypt/\
       && forever restartall', (err, stdout, stderr) => {
       if(err)

@@ -342,7 +342,7 @@ KamadanTrade.prototype.addMessage = function(req,timestamp) {
   var message = this.parseMessageFromRequest(req,timestamp);
   if(message instanceof Error)
     return Promise.reject(message);
-  console.log("Trade message received OK");
+  //console.log("Trade message received OK");
   var quarantined = this.quarantineCheck(message);
   var table = this.table_prefix+(new Date()).getUTCFullYear();
   if(quarantined) {

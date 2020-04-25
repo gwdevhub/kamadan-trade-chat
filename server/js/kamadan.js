@@ -363,24 +363,7 @@ var KamadanClient = {
         self.setPollInterval(3000);
         self.setWebsocketInterval(self.ws_interval + 3000);
       }
-      this.ws.onmessage = function(evt) {
-        self.setPollInterval(30000);
-        try {
-          var data = JSON.parse(evt.data);
-          if(data && data.t && data.m && data.s)
-            self.parseMessages([data], true);
-          else if(data && data.r)
-            self.removeMessages([data.r]);
-          else if(data && data.buy) {
-            window.current_trader_quotes = data;
-            window.current_trader_quotes.updated_at = Date.now();
-            self.redrawTraderQuotes();
-          }
-        }
-        catch(e) {
-          self.error(e);        
-        }
-      };
+      this.ws.onmessage = function() { return self.onWebsocketMessage.apply(self,arguments); }
     } catch(e) {
       self.error("Websocket error exception",e);
       self.setPollInterval(3000);
@@ -777,6 +760,26 @@ var KamadanClient = {
       req.send();
     });
 
+  },
+  onWebsocketMessage:function(evt) {
+    this.setPollInterval(30000);
+    try {
+      var data = JSON.parse(evt.data);
+      if(data && data.t && data.m && data.s)
+        this.parseMessages([data], true);
+      else if(data && data.r)
+        this.removeMessages([data.r]);
+      else if(data && data.buy) {
+        for(var i in data.buy) {
+          window.current_trader_quotes.buy[i] = data.buy[i];
+        }
+        window.current_trader_quotes.updated_at = Date.now();
+        this.redrawTraderQuotes();
+      }
+    }
+    catch(e) {
+      this.error(e);        
+    }
   },
   loadMessages:function() {
     if(!window.localStorage) 
