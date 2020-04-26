@@ -13,6 +13,8 @@ compression = require('compression')
 //Mustache = require('mustache');
 Handlebars = require("handlebars");
 KamadanDB = require(__dirname+'/KamadanDB.class.js');
+LZString = require(__dirname+'/js/lz-string.min.js');
+
 
 global.serverScripts = {};
 

@@ -204,12 +204,16 @@ var KamadanClient = {
     req.send();
   },
   setPollInterval:function(ms) {
-    this.poll_interval = Math.min(120000,ms);
-    this.log("Poll interval set to "+ms+"ms");
+    var new_interval = Math.min(120000,ms);
+    if(new_interval != this.poll_interval)
+      this.log("Poll interval set to "+ms+"ms");
+    this.poll_interval = new_interval;
   },
   setWebsocketInterval:function(ms) {
-    this.ws_interval = Math.min(120000,ms);
-    this.log("Websocket interval set to "+ms+"ms");
+    var new_interval = Math.min(120000,ms);
+    if(new_interval != this.ws_interval)
+      this.log("Websocket interval set to "+ms+"ms");
+    this.ws_interval = new_interval;
   },
   getLastMessage:function() {
     return this.messages ? this.messages[0] : null;
@@ -355,6 +359,8 @@ var KamadanClient = {
       this.ws = new WebSocket(this.websocket_url);
       this.ws.onopen = function(evt) {
         self.log("Websocket opened");
+        self.ws.send(JSON.stringify({"compression":"lz"}));
+        console.log("Websocket message compression set to LZW, see https://pieroxy.net/blog/pages/lz-string/index.html for examples");
         self.setPollInterval(30000);
         self.poll(true);
       }
@@ -763,8 +769,22 @@ var KamadanClient = {
   },
   onWebsocketMessage:function(evt) {
     this.setPollInterval(30000);
+    var message = evt.data;
+    var self=this;
+    /*if(typeof message == 'object' && message.size) {
+      blobToUint8Array(message).then(function(msg) {
+        self.onWebsocketMessage({data:new Uint16Array(msg)});
+      });
+      return;
+    }*/
     try {
-      var data = JSON.parse(evt.data);
+      console.log("Decompressing",message+'',message = LZString.decompressFromUTF16(message));
+    } catch(e) {
+      console.error("Failed to LZString.decompress",message, e);
+      return;
+    }
+    try {
+      var data = JSON.parse(message);
       if(data && data.t && data.m && data.s)
         this.parseMessages([data], true);
       else if(data && data.r)

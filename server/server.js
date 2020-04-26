@@ -215,30 +215,34 @@ function pushMessage(added_message,is_pre) {
   } catch(e) {
     added_message = ''; 
   }
-  if(added_message.length) {
-    var sent_to = 0;
-    if(ws_server) {
-      ws_server.clients.forEach(function each(client) {
-        if (client == ws_server || client.readyState !== WebSocket.OPEN)
-          return;
-        if(is_pre != isPreSearing(client))
-          return;
-        client.send(added_message);
-        sent_to++;
-      });
-    }
-    if(wss_server) {
-      wss_server.clients.forEach(function each(client) {
-        if (client == wss_server || client.readyState !== WebSocket.OPEN)
-          return;
-        if(is_pre != isPreSearing(client))
-          return;
-        client.send(added_message);
-        sent_to++;
-      });
-    }
-    //console.log("Sent to "+sent_to+" connected sockets");
+  if(!added_message.length)
+    return;
+  var compressed = {
+    none:added_message,
+    lz:LZString.compressToUTF16(added_message)
+  };
+  var sent_to = 0;
+  if(ws_server) {
+    ws_server.clients.forEach(function each(client) {
+      if (client == ws_server || client.readyState !== WebSocket.OPEN)
+        return;
+      if(is_pre != isPreSearing(client))
+        return;
+      client.send(compressed[client.compression] || compressed['none']);
+      sent_to++;
+    });
   }
+  if(wss_server) {
+    wss_server.clients.forEach(function each(client) {
+      if (client == wss_server || client.readyState !== WebSocket.OPEN)
+        return;
+      if(is_pre != isPreSearing(client))
+        return;
+      client.send(compressed[client.compression] || compressed['none']);
+      sent_to++;
+    });
+  }
+  //console.log("Sent to "+sent_to+" connected sockets");
 }
 
 
@@ -507,23 +511,29 @@ function init(cb) {
   function onWebsocketMessage(message,ws) {
     ws.isAlive = true;
     ws.recv++;
-    if(!message.length) return;
-    var obj;
-    try {
-      obj = JSON.parse(message);
-    } catch(e) {
-      console.error("Malformed websocket message");
-      console.log(message);
-      return;
+    if(typeof message != 'object') {
+      if(!message.length) return;
+      if(ws.compression == 'lz') {
+        console.log("Decompressed websocket message\n",message+'',message = LZString.decompress(message));
+      }
+      try {
+        message = JSON.parse(message);
+      } catch(e) {
+        console.error("Malformed websocket message");
+        console.log(message);
+        return;
+      }
     }
+    if(message.compression)
+      ws.compression = message.compression;
     var Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
-    if(typeof obj.since != 'undefined') {
-      var rows = Trader.getMessagesSince(obj.since || 'none');
-      return ws.send(JSON.stringify({since:obj.since, num_results:rows.length,results:rows}));
+    if(typeof message.since != 'undefined') {
+      var rows = Trader.getMessagesSince(message.since || 'none');
+      return ws.send(JSON.stringify({since:message.since, num_results:rows.length,results:rows}));
     }
-    if(typeof obj.query != 'undefined') {
+    if(typeof message.query != 'undefined') {
       var gotRows = function(rows) {
-        ws.send(JSON.stringify({query:obj.query, num_results:rows.length,results:rows}));
+        ws.send(JSON.stringify({query:message.query, num_results:rows.length,results:rows}));
       }
       if(last_search_by_ip[ws.ip]) {
         if(Date.now() - 10000 < last_search_by_ip[ip].t) {
@@ -532,13 +542,13 @@ function init(cb) {
         }
       }
       last_search_by_ip[ws.ip] = Date.now();
-      return Trader.search(obj.query,obj.from || 0, obj.to || 0).then(function(rows) {
+      return Trader.search(message.query,message.from || 0, message.to || 0).then(function(rows) {
         delete last_search_by_ip[ws.ip];
         gotRows(rows);
       }).catch(function(e) {
         delete last_search_by_ip[ws.ip];
         console.error(e);
-        ws.send(JSON.stringify({query:obj.query, num_results:0}));
+        gotRows([]);
       });
     }
   }
@@ -554,6 +564,7 @@ function init(cb) {
     
     websrvr.on('connection', function(ws, request) {
       ws.is_presearing = isPreSearing(request);
+      ws.compression='none';
       ws.isAlive = true;
       ws.ip = getIP(request);
       ws.ua = getUserAgent(request);
