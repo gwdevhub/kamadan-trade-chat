@@ -43,8 +43,11 @@ var whitelisted_sources = [
 '127.0.0.1',
 '10.10.10.1',
 '142.44.211.74', // Greg
-'5.67.147.12'// Me
+'46.64.145.237'// Me
 ];
+var sockets_by_ip = {
+  
+}
 var lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
@@ -534,6 +537,11 @@ function init(cb) {
       ws.isAlive = true;
       ws.ip = getIP(request);
       ws.recv = 0;
+      if(sockets_by_ip[ws.ip]) {
+        // 1 socket per ip.
+        try { sockets_by_ip[ws.ip].terminate(); } catch(e) {}
+      }
+      sockets_by_ip[ws.ip] = ws;
       ws.on('pong', heartbeat);
       updateStats();
       ws.on('message', function(message) {
