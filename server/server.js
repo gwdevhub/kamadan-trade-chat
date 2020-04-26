@@ -71,6 +71,9 @@ var http_server;
 var https_server;
 var ws_server;
 var wss_server;
+var last_search_by_ip = {
+  
+};
 
 global.stats = {
   server_started:new Date(),
@@ -78,7 +81,10 @@ global.stats = {
   most_connected_sockets:0
 };
 function getIP(req) {
-  return (req.header('x-forwarded-for') || req.connection.remoteAddress).split(':').pop();
+  var ip = req.connection.remoteAddress;
+  if(typeof req.header != 'undefined')
+    ip = req.header('x-forwarded-for') || ip;
+  return ip.split(':').pop();
 }
 function isLocal(req) {
   return  getIP(req) == '127.0.0.1';
@@ -91,7 +97,10 @@ function shouldCompress (req, res) {
 }
 // Has this request object come from a trusted source?
 function isValidTradeSource(req) {
-  return  whitelisted_sources.indexOf(getIP(req)) != -1;
+  return isWhitelisted(req);
+}
+function isWhitelisted(req) {
+  return whitelisted_sources.indexOf(getIP(req)) != -1;
 }
 function isPreSearing(request) {
   if(typeof request.is_presearing != 'undefined')
@@ -108,6 +117,34 @@ function isPreSearing(request) {
   if(typeof host == 'string' && /presear|ascalon/.test(host))
     return true;
   return false;
+}
+
+function extendedStats() {
+  var getSocketInfo = function(ws) {
+    var info = {};
+    for(var i in ws) {
+      if(i.indexOf('_') == 0)
+        continue;
+      info[i] = ws[i];
+    }
+    return info;
+  }
+  var extended_stats = {sockets:{ws:[],wss:[]}};
+  if(ws_server) {
+    ws_server.clients.forEach(function(client) {
+      if(client == ws_server)
+        return;
+      extended_stats.sockets.ws.push(getSocketInfo(client));
+    });
+  }
+  if(wss_server) {
+    wss_server.clients.forEach(function(client) {
+      if(client == wss_server)
+        return;
+      extended_stats.sockets.wss.push(getSocketInfo(client));
+    });
+  }
+  return extended_stats;
 }
 
 function updateStats() {
@@ -262,6 +299,13 @@ function init(cb) {
 
     app.get('/stats',function(req,res) {
       updateStats().then(function(stats) {
+        if(isWhitelisted(req)) {
+          stats.extended = {};
+          var extended = extendedStats();
+          for(var i in extended) {
+            stats.extended[i] = extended[i];
+          }
+        }
         res.json(stats);
       }).catch(function(e) {
         res.json({"status":"error"});
@@ -365,9 +409,23 @@ function init(cb) {
     });
     app.get('/search/:term', function(req,res) {
       var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
-      Trader.search(req.params.term,0,0).then(function(rows) {
+      var ip = getIP(req);
+      var now = Date.now();
+      var gotRows = function(rows) {
         res.send(renderFile(__dirname+'/index.html',{req:req,messages:rows,search_term:req.params.term}));
+      }
+      if(last_search_by_ip[ip]) {
+        if(now - 10000 < last_search_by_ip[ip].t) {
+          // Last searched 10s ago, empty result.
+          return gotRows([]);
+        }
+      }
+      last_search_by_ip[ip] = { s: req.params.term, t:now};
+      Trader.search(req.params.term,0,0).then(function(rows) {
+        delete last_search_by_ip[ip];
+        return gotRows(rows);
       }).catch(function(e) {
+        delete last_search_by_ip[ip];
         console.error(e);
         res.send(renderFile(__dirname+'/index.html',{req:req,messages:[],search_term:req.params.term}));
       });
@@ -423,6 +481,45 @@ function init(cb) {
     
 		return app;
 	}
+  function onWebsocketMessage(message,ws) {
+    ws.isAlive = true;
+    ws.recv++;
+    if(!message.length) return;
+    var obj;
+    try {
+      obj = JSON.parse(message);
+    } catch(e) {
+      console.error("Malformed websocket message");
+      console.log(message);
+      return;
+    }
+    var Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
+    if(typeof obj.since != 'undefined') {
+      var rows = Trader.getMessagesSince(obj.since || 'none');
+      return ws.send(JSON.stringify({since:obj.since, num_results:rows.length,results:rows}));
+    }
+    if(typeof obj.query != 'undefined') {
+      var gotRows = function(rows) {
+        ws.send(JSON.stringify({query:obj.query, num_results:rows.length,results:rows}));
+      }
+      if(last_search_by_ip[ws.ip]) {
+        if(Date.now() - 10000 < last_search_by_ip[ip].t) {
+          // Last searched 10s ago, empty result.
+          return gotRows([]);
+        }
+      }
+      last_search_by_ip[ws.ip] = Date.now();
+      return Trader.search(obj.query,obj.from || 0, obj.to || 0).then(function(rows) {
+        delete last_search_by_ip[ws.ip];
+        gotRows(rows);
+      }).catch(function(e) {
+        delete last_search_by_ip[ws.ip];
+        console.error(e);
+        ws.send(JSON.stringify({query:obj.query, num_results:0}));
+      });
+    }
+  }
+  
   function configureWebsocketServer(server) {
     let websrvr = new WebSocketServer({
       server: server
@@ -435,32 +532,12 @@ function init(cb) {
     websrvr.on('connection', function(ws, request) {
       ws.is_presearing = isPreSearing(request);
       ws.isAlive = true;
+      ws.ip = getIP(request);
+      ws.recv = 0;
       ws.on('pong', heartbeat);
       updateStats();
       ws.on('message', function(message) {
-        ws.isAlive = true;
-        if(!message.length) return;
-        var obj;
-        try {
-          obj = JSON.parse(message);
-        } catch(e) {
-          console.error("Malformed websocket message");
-          console.log(message);
-          return;
-        }
-        var Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
-        if(typeof obj.since != 'undefined') {
-          var rows = Trader.getMessagesSince(obj.since || 'none');
-          return ws.send(JSON.stringify({since:obj.since, num_results:rows.length,results:rows}));
-        }
-        if(typeof obj.query != 'undefined') {
-          return Trader.search(obj.query,obj.from || 0, obj.to || 0).then(function(rows) {
-            ws.send(JSON.stringify({query:obj.query, num_results:rows.length,results:rows}));
-          }).catch(function(e) {
-            console.error(e);
-            ws.send(JSON.stringify({query:obj.query, num_results:0}));
-          });
-        }
+        return onWebsocketMessage(message,ws);
       });
     });
     const interval = setInterval(function ping() {
