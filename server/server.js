@@ -83,6 +83,16 @@ global.stats = {
   connected_sockets:0,
   most_connected_sockets:0
 };
+function getUserAgent(req) {
+  var ua = '';
+  if(typeof req.headers == 'function')
+    ua = req.headers('user-agent');
+  else if(typeof req.headers != 'undefined')
+    ua = req.headers['user-agent'];
+  else if(typeof req.get == 'function')
+    ua = req.get('user-agent');
+  return ua;
+}
 function getIP(req) {
   var ip = req.connection.remoteAddress;
   if(typeof req.header != 'undefined')
@@ -536,6 +546,7 @@ function init(cb) {
       ws.is_presearing = isPreSearing(request);
       ws.isAlive = true;
       ws.ip = getIP(request);
+      ws.ua = getUserAgent(request);
       ws.recv = 0;
       if(sockets_by_ip[ws.ip]) {
         // 1 socket per ip.
