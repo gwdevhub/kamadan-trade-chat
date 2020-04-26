@@ -771,14 +771,9 @@ var KamadanClient = {
     this.setPollInterval(30000);
     var message = evt.data;
     var self=this;
-    /*if(typeof message == 'object' && message.size) {
-      blobToUint8Array(message).then(function(msg) {
-        self.onWebsocketMessage({data:new Uint16Array(msg)});
-      });
-      return;
-    }*/
     try {
-      console.log("Decompressing",message+'',message = LZString.decompressFromUTF16(message));
+      //console.log("Decompressing",message);
+      message = LZString.decompressFromUTF16(message);
     } catch(e) {
       console.error("Failed to LZString.decompress",message, e);
       return;
