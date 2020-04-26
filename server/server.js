@@ -494,6 +494,16 @@ function init(cb) {
     
 		return app;
 	}
+  function dropSocket(client) {
+    console.log("Dropping socket "+client.ip);
+    var i = client.ip ? sockets_by_ip[client.ip].indexOf(client) : -1;
+    if(i != -1) {
+      sockets_by_ip[client.ip].splice(i,1);
+    }
+    try {
+      client.terminate();
+    } catch(e) {};
+  }
   function onWebsocketMessage(message,ws) {
     ws.isAlive = true;
     ws.recv++;
@@ -548,11 +558,12 @@ function init(cb) {
       ws.ip = getIP(request);
       ws.ua = getUserAgent(request);
       ws.recv = 0;
-      if(sockets_by_ip[ws.ip]) {
-        // 1 socket per ip.
-        try { sockets_by_ip[ws.ip].terminate(); } catch(e) {}
+      sockets_by_ip[ws.ip] = sockets_by_ip[ws.ip] || [];
+      while(sockets_by_ip[ws.ip].length > 3) {
+        // 3 socket per ip.
+        dropSocket(sockets_by_ip[ws.ip].shift());
       }
-      sockets_by_ip[ws.ip] = ws;
+      sockets_by_ip[ws.ip].push(ws);
       ws.on('pong', heartbeat);
       updateStats();
       ws.on('message', function(message) {
@@ -562,8 +573,7 @@ function init(cb) {
     const interval = setInterval(function ping() {
       websrvr.clients.forEach(function each(ws) {
         if (ws.isAlive === false) {
-          ws.terminate();
-          delete sockets_by_ip[ws.ip];
+          dropSocket(ws);
           return;
         }
         ws.isAlive = false;
