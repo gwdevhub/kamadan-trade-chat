@@ -431,13 +431,11 @@ function init(cb) {
       var gotRows = function(rows) {
         res.send(renderFile(__dirname+'/index.html',{req:req,messages:rows,search_term:req.params.term}));
       }
-      if(last_search_by_ip[ip]) {
-        if(now - 10000 < last_search_by_ip[ip].t) {
-          // Last searched 10s ago, empty result.
-          return gotRows([]);
-        }
+      if(last_search_by_ip[ws.ip] && last_search_by_ip[ip] > 4) {
+        return gotRows([]); // 4 simultaneous searches per IP
       }
-      last_search_by_ip[ip] = { s: req.params.term, t:now};
+      last_search_by_ip[ip] = last_search_by_ip[ip] || 0;
+      last_search_by_ip[ip]++;
       Trader.search(req.params.term,0,0).then(function(rows) {
         delete last_search_by_ip[ip];
         return gotRows(rows);
@@ -535,13 +533,11 @@ function init(cb) {
       var gotRows = function(rows) {
         ws.send(JSON.stringify({query:message.query, num_results:rows.length,results:rows}));
       }
-      if(last_search_by_ip[ws.ip]) {
-        if(Date.now() - 10000 < last_search_by_ip[ip].t) {
-          // Last searched 10s ago, empty result.
-          return gotRows([]);
-        }
+      if(last_search_by_ip[ws.ip] && last_search_by_ip[ws.ip] > 4) {
+        return gotRows([]); // 4 simultaneous searches per IP
       }
-      last_search_by_ip[ws.ip] = Date.now();
+      last_search_by_ip[ws.ip] = last_search_by_ip[ws.ip] || 0;
+      last_search_by_ip[ws.ip]++;
       return Trader.search(message.query,message.from || 0, message.to || 0).then(function(rows) {
         delete last_search_by_ip[ws.ip];
         gotRows(rows);

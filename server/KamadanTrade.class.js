@@ -85,12 +85,37 @@ KamadanTrade.prototype.getTraderPrices = function() {
   });
   
 }
-KamadanTrade.prototype.getPricingHistory = function(model_id,from,to) {
+KamadanTrade.prototype.getPricingHistory = function(model_id,from,to, average_interval_minutes) {
   var self = this;
   var result = [];
   return new Promise(function(resolve,reject) {
-    var args = [model_id,from.substr(0,10),to.substr(0,10)];
-    self.db.query("SELECT m,p,t,s FROM trader_prices WHERE m = ? AND t >= ? and t <= ? ORDER BY t DESC",args).then(function(rows) {
+    model_id = parseInt(model_id,10);
+    from = parseInt(from.substr(0,10),10);
+    to = parseInt(to.substr(0,10),10);
+    if(typeof average_interval_minutes != 'number')
+      average_interval_minutes = 60;
+    var interval_seconds = parseInt(average_interval_minutes * 60);
+    var interval_rounded = "floor(t/("+interval_seconds+"))*"+interval_seconds;
+    
+    // Original query, includes every point.
+    var query = "SELECT m,p,t,s FROM trader_prices WHERE m = "+model_id+" AND t >= "+from+" and t <= "+to+" ORDER BY t DESC";
+    
+    // Rounded to average_interval_minutes
+    /*var query = "SELECT * FROM ((SELECT \
+              "+interval_rounded+" AS t,\
+              m,s,round(avg(p)) AS p \
+              FROM trader_prices \
+              WHERE m = "+model_id+"\
+              AND t >= "+from+"\
+              AND t <= "+to+"\
+              GROUP BY m,s,"+interval_rounded+" DESC)\
+              UNION\
+              (SELECT \
+              t,m,s,p FROM trader_prices WHERE m = "+model_id+"\
+              AND t >= "+from+"\
+              AND t <= "+to+"\
+              GROUP BY m,s,t DESC LIMIT 1)) Z ORDER BY t desc;";*/
+    self.db.query(query).then(function(rows) {
       result = rows;
     }).finally(function() {
       return resolve(result);
@@ -211,7 +236,6 @@ KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
       to_date = new Date();
   }
   latest_year = to_date.getUTCFullYear();
-  earliest_year = 2015;
   if(typeof from_unix_ms != 'undefined' && from_unix_ms != 0) {
     console.log("from_unix_ms "+from_unix_ms);
     from_unix_ms = (from_unix_ms+'').trim();
@@ -274,7 +298,7 @@ KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
         for(var i in rows) {
           rows_final.push(rows[i]);
         }
-        if(rows_final.length < search_results_max)
+        if(rows_final.length < search_results_max && latest_year - year < 3) // NOTE: search back 3 years max
           return searchYear(year-1);
         return Promise.resolve(rows_final);
       });
