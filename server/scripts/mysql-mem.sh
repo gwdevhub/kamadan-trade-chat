@@ -1,6 +1,6 @@
 #!/bin/sh
 # you might want to add some user authentication here
-mysql -e "show variables; show status" | awk '  
+sudo mysql -u root -e "show variables; show status" | awk '  
 {
 VAR[$1]=$2  
 }
