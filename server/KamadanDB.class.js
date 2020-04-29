@@ -22,7 +22,9 @@ var KamadanDB = {
           delete results['meta'];
           return Promise.resolve(results);
         }).finally(function() {
-          conn.end();
+          conn.end(function(err) {
+            if(err) conn.destroy();
+          });
         });
       });
     });
@@ -38,7 +40,9 @@ var KamadanDB = {
           delete results['meta'];
           return Promise.resolve(results);
         }).finally(function() {
-          conn.end();
+          conn.end(function(err) {
+            if(err) conn.destroy();
+          });
         });
       });
     });
@@ -60,7 +64,7 @@ var KamadanDB = {
       database:ServerConfig.get('db_schema'),
       user:ServerConfig.get('db_user'), 
       password: ServerConfig.get('db_pass'),
-      connectionLimit: 5
+      connectionLimit: 10
     });
     var self = this;
     self.initted = true;
