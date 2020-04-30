@@ -214,14 +214,14 @@ KamadanTrade.prototype.quarantineCheck = function(message) {
 KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
   var self = this;
   term = ((term || '')+'').toLowerCase().trim();
+  if(!term.length)
+    return Promise.resolve(this.live_message_log);
   this.db.query("INSERT INTO "+self.table_prefix+"searchlog (term,last_search,count) VALUES (?,?,1) ON DUPLICATE KEY UPDATE last_search = ?, count = count+1",[term,Date.now(),Date.now()]);
   var by_user = false;
   if(term.indexOf('user:') == 0) {
     by_user = true;
     term = term.substring(5);
   }
-  if(!term.length)
-    return Promise.resolve(this.live_message_log);
   var to_date = new Date();
   var from_date;
   var latest_year;
