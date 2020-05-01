@@ -134,7 +134,7 @@ KamadanTrade.prototype.getPricingHistory = function(model_id,from,to, average_in
                 AND t.t >= "+from+" and t.t <= "+to+"\
               WHERE i.m = ?\
               ORDER BY t DESC";
-    var query = "SELECT m,p,t,s FROM trader_prices2 WHERE m = "+model_id+" AND t >= "+from+" and t <= "+to+" ORDER BY t DESC";
+    //var query = "SELECT m,p,t,s FROM trader_prices2 WHERE m = "+model_id+" AND t >= "+from+" and t <= "+to+" ORDER BY t DESC";
     
     // Rounded to average_interval_minutes
     /*var query = "SELECT * FROM ((SELECT \
