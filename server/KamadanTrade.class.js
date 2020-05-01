@@ -31,6 +31,7 @@ KamadanTrade.prototype.addTraderPrices = function(json) {
     self.getTraderPrices().then(function(current_prices) {
       var updated_prices = [];
       var models_done = {buy:{},sell:{}};
+      var return_prices = {buy:{},sell:{}};
       for(var key in models_done) {
         for(var i in json[key]) {
           var current = current_prices[key][json[key][i].m];
@@ -48,20 +49,47 @@ KamadanTrade.prototype.addTraderPrices = function(json) {
       }
       var sql_args = [];
       var sql_insert = [];
+      // 1. Insert ignore into trader_items table
       for(var i in updated_prices) {
         sql_args.push(updated_prices[i].m);
-        sql_args.push(updated_prices[i].p);
-        sql_args.push(updated_prices[i].t);
-        sql_args.push(updated_prices[i].s);
-        sql_insert.push('(?,?,?,?)');
+        sql_insert.push('(?)');
       }
-      self.db.query("INSERT INTO trader_prices (m,p,t,s) VALUES "+sql_insert.join(','),sql_args).then(function(res) {
-        console.log("Trader prices updated: "+res.affectedRows);
-      }).finally(function() {
-        self.getTraderPrices().then(function(prices) {
-          resolve(prices);
-        });
+      self.db.query("INSERT IGNORE INTO trader_items (m) VALUES "+sql_insert.join(','),sql_args).catch(function(e) {
+        console.log("There was an error inserting into trader_items");
+        console.error(e);
+      }).then(function(res) {
+        // 2. Fetch back a listing of the items to find the unique id
+        self.db.query("SELECT * from trader_items").then(function(trader_items) {
+          var item_id_by_modstruct = {};
+          for(var i=0;i<trader_items.length;i++) {
+            item_id_by_modstruct[trader_items[i].m] = trader_items[i].i;
+          }
+          // 3. Do the insert into trader_prices
+          sql_args = [];
+          sql_insert = [];
+          for(var i in updated_prices) {
+            sql_args.push(item_id_by_modstruct[updated_prices[i].m]);
+            sql_args.push(updated_prices[i].p);
+            sql_args.push(updated_prices[i].t);
+            sql_args.push(updated_prices[i].s);
+            sql_insert.push('(?,?,?,?)');
+            if(updated_prices[i].s) {
+              return_prices.sell[updated_prices[i].m] = {p:updated_prices[i].p,t:updated_prices[i].t};
+            } else {
+              return_prices.buy[updated_prices[i].m] = {p:updated_prices[i].p,t:updated_prices[i].t};
+            }
+          }
+          self.db.query("INSERT INTO trader_prices2 (i,p,t,s) VALUES "+sql_insert.join(','),sql_args).then(function(res) {
+            console.log("Trader prices updated: "+res.affectedRows);
+          }).catch(function(e) {
+            console.log("There was an error inserting into trader_prices");
+            console.error(e);
+          }).finally(function() {
+            resolve(return_prices);
+          });
+        })        
       });
+      
     });
   });
   
@@ -70,7 +98,10 @@ KamadanTrade.prototype.getTraderPrices = function() {
   var self = this;
   var result = {buy:{},sell:{}};
   return new Promise(function(resolve,reject) {
-    self.db.query("SELECT m,p,t,s FROM trader_prices GROUP BY m desc").then(function(rows) {
+    self.db.query("SELECT i.m,t.p,t.t,t.s\
+              FROM trader_prices2 t\
+              JOIN trader_items i ON i.i = t.i\
+              GROUP BY m desc").then(function(rows) {
       for(var i=0;i<rows.length;i++) {
         var res = {p:rows[i].p,t:rows[i].t};
         if(rows[i].s) {
@@ -89,7 +120,6 @@ KamadanTrade.prototype.getPricingHistory = function(model_id,from,to, average_in
   var self = this;
   var result = [];
   return new Promise(function(resolve,reject) {
-    model_id = parseInt(model_id,10);
     from = parseInt(from.substr(0,10),10);
     to = parseInt(to.substr(0,10),10);
     if(typeof average_interval_minutes != 'number')
@@ -98,7 +128,13 @@ KamadanTrade.prototype.getPricingHistory = function(model_id,from,to, average_in
     var interval_rounded = "floor(t/("+interval_seconds+"))*"+interval_seconds;
     
     // Original query, includes every point.
-    var query = "SELECT m,p,t,s FROM trader_prices WHERE m = "+model_id+" AND t >= "+from+" and t <= "+to+" ORDER BY t DESC";
+    var query = "SELECT i.m,t.p,t.t,t.s\
+              FROM trader_items i\
+              JOIN trader_prices2 t ON i.i = t.i\
+                AND t.t >= "+from+" and t.t <= "+to+"\
+              WHERE i.m = ?\
+              ORDER BY t DESC";
+    var query = "SELECT m,p,t,s FROM trader_prices2 WHERE m = "+model_id+" AND t >= "+from+" and t <= "+to+" ORDER BY t DESC";
     
     // Rounded to average_interval_minutes
     /*var query = "SELECT * FROM ((SELECT \
@@ -115,7 +151,7 @@ KamadanTrade.prototype.getPricingHistory = function(model_id,from,to, average_in
               AND t >= "+from+"\
               AND t <= "+to+"\
               GROUP BY m,s,t DESC LIMIT 1)) Z ORDER BY t desc;";*/
-    self.db.query(query).then(function(rows) {
+    self.db.query(query, model_id.trim()).then(function(rows) {
       result = rows;
     }).finally(function() {
       return resolve(result);
@@ -162,18 +198,27 @@ KamadanTrade.prototype.init = function() {
     )\
     COLLATE='utf8mb4_general_ci'\
     ENGINE=InnoDB;";
-    var item_prices_table = "CREATE TABLE IF NOT EXISTS trader_prices (\
+    var item_prices_table = "CREATE TABLE IF NOT EXISTS trader_prices2 (\
       t BIGINT(20) UNSIGNED NOT NULL COMMENT 'Unix timestamp with milliseconds',\
-      m INT UNSIGNED NOT NULL COMMENT 'model_id of quoted item',\
+      i SMALLINT UNSIGNED NOT NULL COMMENT 'unique id of quoted item, see trader_items',\
       s TINYINT NOT NULL COMMENT '1 if sell quote, 1 if buy quote',\
       p INT UNSIGNED NOT NULL COMMENT 'UTC timestamp of quote',\
-      PRIMARY KEY (t,m),\
-      INDEX m (m)\
+      PRIMARY KEY (t,i),\
+      INDEX i (i)\
       )\
       COLLATE='utf8mb4_general_ci'\
       ENGINE=InnoDB;";
-    
+    var item_ids_table = "CREATE TABLE IF NOT EXISTS `trader_items` (\
+      i SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'unique identifier',\
+      m VARCHAR(128) NOT NULL COMMENT 'model_id-mod_struct as a string',\
+      PRIMARY KEY (i),\
+      UNIQUE INDEX model_modstruct (m)\
+    )\
+    COMMENT='A lookup table of items from trader, keyed by mod struct and model id'\
+    COLLATE='utf8mb4_general_ci'\
+    ENGINE=InnoDB;";
     return Promise.all([
+      self.db.query(item_ids_table),
       self.db.query(item_prices_table),
       self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"searchlog ( term VARCHAR(100) NOT NULL, last_search BIGINT NOT NULL, count INT NOT NULL, PRIMARY KEY (term)) COLLATE='utf8mb4_general_ci'"),
       self.db.query("CREATE TABLE IF NOT EXISTS "+self.table_prefix+"quarantine "+create_statement),

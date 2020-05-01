@@ -209,6 +209,44 @@ KamadanTrade.table_prefix = 'kamadan_';
 var AscalonTrade = new TradeModule();
 AscalonTrade.table_prefix = 'ascalon_';
 
+function pushPrices(prices,is_pre) {
+  try {
+    prices = JSON.stringify(prices);
+  } catch(e) {
+    prices = ''; 
+  }
+  if(!prices.length)
+    return;
+  var compressed = {
+    none:prices,
+    lz:LZString.compressToUTF16(prices)
+  };
+  var sent_to = 0;
+  if(ws_server) {
+    ws_server.clients.forEach(function each(client) {
+      if (client == ws_server || client.readyState !== WebSocket.OPEN)
+        return;
+      if(is_pre != isPreSearing(client))
+        return;
+      if(!client.send_prices)
+        return;
+      client.send(compressed[client.compression] || compressed['none']);
+      sent_to++;
+    });
+  }
+  if(wss_server) {
+    wss_server.clients.forEach(function each(client) {
+      if (client == wss_server || client.readyState !== WebSocket.OPEN)
+        return;
+      if(is_pre != isPreSearing(client))
+        return;
+      if(!client.send_prices)
+        return;
+      client.send(compressed[client.compression] || compressed['none']);
+      sent_to++;
+    });
+  }
+}
 function pushMessage(added_message,is_pre) {
   try {
     added_message = JSON.stringify(added_message);
@@ -242,7 +280,6 @@ function pushMessage(added_message,is_pre) {
       sent_to++;
     });
   }
-  //console.log("Sent to "+sent_to+" connected sockets");
 }
 
 
@@ -366,13 +403,15 @@ function init(cb) {
         if(err) console.error(err);
         console.log("Trader quotes added");
         // Don't drop out on error; we'll unlock the stale file later
-        KamadanTrade.addTraderPrices(json).then(function(current_trader_quotes) {
-          console.log("Trader prices updated");
-          if(!current_trader_quotes)
+        KamadanTrade.addTraderPrices(json).then(function(updated_trader_prices) {
+          if(!updated_trader_prices)
             return;
-          global.config.current_trade_prices = current_trader_quotes;
-          pushMessage(global.config.current_trade_prices,true);
-          pushMessage(global.config.current_trade_prices,false);
+          console.log("Trader prices updated");
+          pushPrices(updated_trader_prices,true);
+          pushPrices(updated_trader_prices,false);
+          KamadanTrade.getTraderPrices().then(function(prices) {
+            global.config.current_trade_prices = prices;
+          });
         }).catch(function(e) {
           console.error(e);
         }).finally(function() {
@@ -524,6 +563,8 @@ function init(cb) {
     }
     if(message.compression)
       ws.compression = message.compression;
+    if(message.send_prices)
+      ws.send_prices = 1;
     var Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
     if(typeof message.since != 'undefined') {
       var rows = Trader.getMessagesSince(message.since || 'none');

@@ -359,7 +359,7 @@ var KamadanClient = {
       this.ws = new WebSocket(this.websocket_url);
       this.ws.onopen = function(evt) {
         self.log("Websocket opened");
-        self.ws.send(JSON.stringify({"compression":"lz"}));
+        self.ws.send(JSON.stringify({"compression":"lz","send_prices":1}));
         console.log("Websocket message compression set to LZW, see https://pieroxy.net/blog/pages/lz-string/index.html for examples");
         self.setPollInterval(30000);
         self.poll(true);
@@ -784,9 +784,17 @@ var KamadanClient = {
         this.parseMessages([data], true);
       else if(data && data.r)
         this.removeMessages([data.r]);
-      else if(data && data.buy) {
-        for(var i in data.buy) {
-          window.current_trader_quotes.buy[i] = data.buy[i];
+      if(data && (data.buy || data.sell)) {
+        console.log("Trader prices received",data);
+        if(data.buy) {
+          for(var i in data.buy) {
+            window.current_trader_quotes.sell[i] = data.sell[i];
+          }
+        }
+        if(data.sell) {
+          for(var i in data.sell) {
+            window.current_trader_quotes.sell[i] = data.sell[i];
+          }
         }
         window.current_trader_quotes.updated_at = Date.now();
         this.redrawTraderQuotes();
