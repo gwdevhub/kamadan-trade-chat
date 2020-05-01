@@ -98,10 +98,14 @@ KamadanTrade.prototype.getTraderPrices = function() {
   var self = this;
   var result = {buy:{},sell:{}};
   return new Promise(function(resolve,reject) {
-    self.db.query("SELECT i.m,t.p,t.t,t.s\
+    var query = "SELECT t.p,t.t,t.s, i.m \
+            FROM (SELECT MAX(t) AS t, i, s\
               FROM trader_prices2 t\
-              JOIN trader_items i ON i.i = t.i\
-              GROUP BY m desc").then(function(rows) {
+              GROUP BY i,s) Z \
+            JOIN trader_prices2 t ON Z.i = t.i\
+              AND Z.t = t.t\
+            JOIN trader_items i ON i.i = t.i";
+    self.db.query(query).then(function(rows) {
       for(var i=0;i<rows.length;i++) {
         var res = {p:rows[i].p,t:rows[i].t};
         if(rows[i].s) {
