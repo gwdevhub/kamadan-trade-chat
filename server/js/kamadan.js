@@ -788,7 +788,7 @@ var KamadanClient = {
         console.log("Trader prices received",data);
         if(data.buy) {
           for(var i in data.buy) {
-            window.current_trader_quotes.sell[i] = data.sell[i];
+            window.current_trader_quotes.buy[i] = data.buy[i];
           }
         }
         if(data.sell) {
