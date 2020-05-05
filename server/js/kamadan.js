@@ -106,6 +106,41 @@ var KamadanClient = {
   poll_interval:3000,
   ws_interval:60000,
   debug:/local/.test(window.location.hostname),
+  isVisible:function() {
+    if (typeof document.hidden !== "undefined")
+      return document.hidden == false;
+    if (typeof document.msHidden !== "undefined")
+      return document.msHidden == false;
+    if (typeof document.webkitHidden !== "undefined")
+      return document.webkitHidden == false;
+    return true;
+  },
+  onVisibilityChange:function() {
+    if(this.isVisible()) {
+      this.connect();
+      this.log("Window is now visible");
+    } else {
+      this.disconnect();
+      this.log("Window hidden");
+    }
+  },
+  disconnect:function() {
+    var self=this;
+    if(self.ws) {
+      try {
+        self.ws.close();
+        setTimeout(function() {
+          delete self.ws;
+        },250);
+      } catch(e) {
+        // Silent
+      }
+    }
+  },
+  connect:function() {
+    this.pollWebsocket();
+    this.poll();
+  },
   log:function() {
     if(!this.debug) return;
     console.log.apply(console,arguments);
@@ -245,8 +280,12 @@ var KamadanClient = {
     }
     this.last_search_term = this.getSearchTerm();
     this.search_results = window.search_results || [];
-    var self = this;
     
+    var self = this;
+    document.addEventListener('visibilitychange', function() { self.onVisibilityChange(); }, false);
+    document.addEventListener('msvisibilitychange', function() { self.onVisibilityChange(); }, false);
+    document.addEventListener('webkitvisibilitychange', function() { self.onVisibilityChange(); }, false);
+
     this.notify_popup.addEventListener('click',function(e) {
       self.onNotifyClose();
     });
@@ -346,6 +385,8 @@ var KamadanClient = {
     setTimeout(function() {
       self.pollWebsocket();
     },this.ws_interval);
+    if(!this.isVisible())
+      return this.disconnect();
     if (this.ws) {
       switch(this.ws.readyState) {
         case WebSocket.OPEN:
@@ -476,6 +517,8 @@ var KamadanClient = {
     document.getElementById('trader-overlay-items').innerHTML = overlay_html;
   },
   timestamps:function() {
+    if(!this.isVisible())
+      return;
     var rows = document.querySelectorAll('.age');
     try {
       for(var i=0;i<rows.length;i++) {
@@ -858,6 +901,8 @@ var KamadanClient = {
     var self = this;
     if(!force && self.ws && self.ws.readyState != WebSocket.CLOSED)
         return;
+    if(!this.isVisible())
+      return this.disconnect();
     this.log("polling");
     function requeue() {
       if(self.poller) {
