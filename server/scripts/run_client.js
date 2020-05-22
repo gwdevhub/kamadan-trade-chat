@@ -12,7 +12,7 @@ if(kamadan_gw_login && kamadan_gw_login.email && kamadan_gw_login.email.trim().l
   exec('ps -elf | grep "[-]email \"'+kamadan_gw_login.email+'\""',function(a,stdout,c) {
     if(stdout.indexOf('-email') != -1)
       return;// console.log("Guild Wars client already running!\n"+stdout);
-    let cmd = 'cd ~/kamadan-trade-client \
+    let cmd = 'cd '+__dirname+'/../../kamadan-trade-client \
     && sudo sh run_client.sh "'+kamadan_gw_login.email+'" "'+kamadan_gw_login.password+'" "'+kamadan_gw_login.character+'" 449 0 > /dev/null 2>&1';
     console.log("Starting Kamadan Guild Wars client!\n"+cmd);
     exec(cmd);
@@ -25,7 +25,7 @@ if(ascalon_gw_login && ascalon_gw_login.email && ascalon_gw_login.email.trim().l
   exec('ps -elf | grep "[-]email \"'+ascalon_gw_login.email+'\""',function(a,stdout,c) {
     if(stdout.indexOf('-email') != -1)
       return;// console.log("Guild Wars client already running!\n"+stdout);
-    let cmd = 'cd ~/kamadan-trade-client \
+    let cmd = 'cd '+__dirname+'/../../kamadan-trade-client \
     && sudo sh run_client.sh "'+ascalon_gw_login.email+'" "'+ascalon_gw_login.password+'" "'+ascalon_gw_login.character+'" 148 3 > /dev/null 2>&1';
     console.log("Starting Ascalon Guild Wars client!\n"+cmd);
     exec(cmd);

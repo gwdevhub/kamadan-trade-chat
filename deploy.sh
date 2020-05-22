@@ -77,7 +77,7 @@ sudo mysql -u ${DB_USER} -p${DB_PASS} -e "CREATE DATABASE IF NOT EXISTS ${DB_SCH
 
 printf "${RED}*** Installing any missing node_modules ***${NC}\n";
 forever --help 2>/dev/null > /dev/null || sudo npm install forever -g;
-cd ~; 
+cd "${PROJECT_CODE_FOLDER}/.."; 
 rm -R ./node_modules; 
 tar -zxf "${PROJECT_CODE_FOLDER}/server/node_modules.tar.gz"
 mkdir -p ./node_modules;
