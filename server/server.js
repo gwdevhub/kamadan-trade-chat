@@ -470,10 +470,10 @@ function init(cb) {
       var gotRows = function(rows) {
         res.send(renderFile(__dirname+'/index.html',{req:req,messages:rows,search_term:req.params.term}));
       }
-      if(last_search_by_ip[ws.ip] && last_search_by_ip[ip] > 4) {
+      last_search_by_ip[ip] = last_search_by_ip[ip] || 0;
+      if(last_search_by_ip[ip] > 4) {
         return gotRows([]); // 4 simultaneous searches per IP
       }
-      last_search_by_ip[ip] = last_search_by_ip[ip] || 0;
       last_search_by_ip[ip]++;
       Trader.search(req.params.term,0,0).then(function(rows) {
         delete last_search_by_ip[ip];
