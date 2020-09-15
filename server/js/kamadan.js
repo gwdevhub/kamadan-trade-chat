@@ -266,6 +266,8 @@ var KamadanClient = {
   },
   init:function() {
     window.scrollTo(0,0);
+    this.pricing_history.from_original = this.pricing_history.from.clone();
+    this.pricing_history.to_original = this.pricing_history.to.clone();
     this.current_wrapper = document.getElementById('current-wrapper');
     this.page_wrapper = document.getElementById('page');
     this.results_header = document.getElementById('results-header');
@@ -309,8 +311,23 @@ var KamadanClient = {
       e.stopPropagation();
     });
     document.getElementById('reset-zoom').addEventListener('click',function(e) {
-      self.pricing_history.chart.resetZoom();
-      this.style.display = 'none';
+      self.resetZoom();
+      self.resetTimeline();
+    });
+    var days = 30;
+    document.getElementById('graph-prev').addEventListener('click',function(e) {
+      self.resetZoom();
+      self.pricing_history.from.modify('-'+days+' days');
+      self.pricing_history.to.modify('-'+days+' days');
+      self.showPricingHistory();
+    });
+    document.getElementById('graph-next').addEventListener('click',function(e) {
+      if(self.pricing_history.to.getTime() >= (new Date()).getTime())
+        return;
+      self.resetZoom();
+      self.pricing_history.from.modify('+'+days+' days');
+      self.pricing_history.to.modify('+'+days+' days');
+      self.showPricingHistory();
     });
     var tabs = document.getElementsByClassName('trader-table-tab');
     for(var i=0;i<tabs.length;i++) {
@@ -656,14 +673,25 @@ var KamadanClient = {
       this.saveMessages(); 
     }
   },
-  showPricingHistory:function(model_id) {
+  showPricingHistory:function(model_id, from, to) {
     this.listings_div.classList.add('showing-prices');
-    document.getElementById('reset-zoom').style.display = 'none';
     if(model_id)
       this.pricing_history.model_id = model_id;
+    if(from)
+      this.pricing_history.from = from;
+    if(to)
+      this.pricing_history.to = to;
     var self = this;
     this.getPricingHistory().then(function(data) {
-      console.log(data);
+      if(self.pricing_history.to.getTime() != self.pricing_history.to_original.getTime())
+        self.listings_div.classList.add('graph-panned');
+      else
+        self.listings_div.classList.remove('graph-panned');
+      console.log(self.pricing_history.to, self.pricing_history.to_original);
+      if(self.pricing_history.to.getTime() >= self.pricing_history.to_original.getTime())
+        self.listings_div.classList.add('graph-today');
+      else
+        self.listings_div.classList.remove('graph-today');
       var dataPoints = {};
       var bgCol = 'rgba(252, 247, 200,0.3)';
       var dragCol = 'rgba(108,82,34,0.5)';
@@ -687,7 +715,7 @@ var KamadanClient = {
         dataPoints[data[i].m].data.push({x:data[i].t,y:data[i].p});
       }
       var dataSets = [];
-      var suggestedMax = Math.floor(Date.now() / 1000);
+      var suggestedMax = Math.floor(self.pricing_history.to.getTime() / 1000);
       var suggestedMin = Math.floor(self.pricing_history.from.getTime() / 1000);
       for(var i in dataPoints) {
         if(dataPoints[i].data[0].x < suggestedMax)
@@ -761,7 +789,7 @@ var KamadanClient = {
                   animationDuration: 3
                 },
                 onZoomComplete: function() {
-                  document.getElementById('reset-zoom').style.display = 'block';
+                  self.listings_div.classList.add('graph-zoomed');
                 }
               }
             }
@@ -772,7 +800,9 @@ var KamadanClient = {
       canvas.height = canvas.parentElement.offsetHeight;
       canvas.width = canvas.parentElement.offsetWidth;
       if(self.pricing_history.chart) {
-        self.pricing_history.chart.data.datasets = dataSets;
+        for(var i in chart_args) {
+          self.pricing_history.chart[i] = chart_args[i];
+        }
         self.pricing_history.chart.update();
       } else {
         self.pricing_history.chart = new Chart('prices-graph-canvas', chart_args);
@@ -785,10 +815,22 @@ var KamadanClient = {
   hidePricingHistory:function() {
     this.listings_div.classList.remove('showing-prices');
   },
+  resetTimeline:function() {
+    this.pricing_history.from = this.pricing_history.from_original;
+    this.pricing_history.to = this.pricing_history.to_original;
+    this.listings_div.classList.remove('graph-panned');
+    this.showPricingHistory();
+  },
+  resetZoom:function() {
+    if(this.pricing_history.chart)
+      this.pricing_history.chart.resetZoom();
+    this.listings_div.classList.remove('graph-zoomed');
+  },
   getPricingHistory:function() {
     var self = this;
     if(!self.pricing_history.model_id)
       return Promise.reject(new Error("Invalid model_id"));
+    self.resetZoom();
     return new Promise(function(resolve,reject) {
       var req = new XMLHttpRequest();
       req.addEventListener("load", function() {

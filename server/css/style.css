@@ -226,7 +226,7 @@ button:focus {outline:0;}
     overflow:hidden;
     position:relative
 }
-#results-header, #reset-zoom {
+#results-header, #reset-zoom, .nav-lr {
     display:flex;
     border:1px solid #ccc;
     border-radius:4px 4px 0 0;
@@ -243,6 +243,30 @@ button:focus {outline:0;}
   height:auto;
   border-radius:4px;
   padding:2px 4px;
+  display:none;
+}
+#listings.graph-zoomed #reset-zoom,
+#listings.graph-panned #reset-zoom {
+  display:block;
+}
+#listings.graph-today #graph-next {
+  display:none;
+}
+.nav-lr {
+  position:absolute;
+  top:50%;
+  display:block;
+  margin-top:-1rem;
+  height:2rem;
+  width:1.5rem;
+  left:0;
+  border-radius:4px;
+  padding:0;
+  text-align:center;
+}
+#graph-next {
+  left:auto;
+  right:0;
 }
 #connection-indicator{
     margin-left:5px;

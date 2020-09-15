@@ -160,6 +160,7 @@ Vagrant.configure("2") do |config|
 		config.vm.define machine_name do |machine|
 			machine.vm.box = VirtualBox['box_name']
 			machine.vm.box_url = VirtualBox['box_url'] || nil
+      machine.vbguest.auto_update = false
 			local_machine_setup(machine,machine_name,machine_properties);
 		end
 		config.vm.provider :virtualbox do |v, override|
