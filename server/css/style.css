@@ -36,6 +36,7 @@ table,tbody{
 #listings.showing-prices #prices-graph-container {
   display:block;
   position:relative;
+  padding:0 1.5rem;
 }
 #listings.showing-prices #live-trade-feed {
   display:none;

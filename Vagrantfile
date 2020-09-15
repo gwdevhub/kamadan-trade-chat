@@ -116,7 +116,7 @@ Machines = {
 			'os' => 'linux'
     },
 		'staging' => {
-			'ip_address' => 'kamadan.gwtoolbox.com',
+			'ip_address' => '34.248.80.106',
 			'server_config' => cloud_config.merge({
 				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
         'is_cloud'=>1,

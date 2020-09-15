@@ -687,7 +687,6 @@ var KamadanClient = {
         self.listings_div.classList.add('graph-panned');
       else
         self.listings_div.classList.remove('graph-panned');
-      console.log(self.pricing_history.to, self.pricing_history.to_original);
       if(self.pricing_history.to.getTime() >= self.pricing_history.to_original.getTime())
         self.listings_div.classList.add('graph-today');
       else
@@ -816,8 +815,8 @@ var KamadanClient = {
     this.listings_div.classList.remove('showing-prices');
   },
   resetTimeline:function() {
-    this.pricing_history.from = this.pricing_history.from_original;
-    this.pricing_history.to = this.pricing_history.to_original;
+    this.pricing_history.from = this.pricing_history.from_original.clone();
+    this.pricing_history.to = this.pricing_history.to_original.clone();
     this.listings_div.classList.remove('graph-panned');
     this.showPricingHistory();
   },
