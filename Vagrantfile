@@ -24,6 +24,11 @@ end
 
 enforce_machine_name_requirement()
 
+Ubuntu20_Official_amd64 = {
+  'box_url' => 'https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64-vagrant.box',
+  'box_name' => 'ubuntu-20.04_amd64_official'
+}
+
 Ubuntu18_Official_amd64 = {
   'box_url' => 'https://cloud-images.ubuntu.com/bionic/20200206/bionic-server-cloudimg-amd64-vagrant.box',
   'box_name' => 'ubuntu-18.04_amd64_official'
@@ -44,7 +49,7 @@ Debian8_Official_amd64 = {
 # Choose 1 of the above boxes for our local environment. 
 # Try swapping out for i386 version if your PC is a million years old and doesn't support VT-x.
 
-VirtualBox = Ubuntu18_Official_amd64
+VirtualBox = Ubuntu20_Official_amd64
 
 # ------------------    Definitions		 ------------------
 if File.file?("#{File.dirname(__FILE__)}/.env.rb") then
@@ -65,6 +70,7 @@ server_config = {
   'db_user'=>'nodejs',
   'db_host'=>'127.0.0.1',
   'db_schema'=>'kamadan',
+  #'disable_client'=>true,
   'db_pass'=>ENV["DB_PASS"] || 'K4maDan1423-zseq',
   'google_drive_backups_folder_id' => '1ZzNLnWUmj3SbyoI3zc2MJBjRifLWGzpP',
   'google_apis_private_key' => ENV["google_apis_private_key"],
@@ -87,7 +93,9 @@ Machines = {
 	'VirtualBox' => {
 		'local' => {
 			'hostnames' => ['local.kamadan.com'],	# With virtualbox, the first item is added to hosts file, then removed for further processing (see VagrantConfig/Functions.rb)
-			'server_config' => local_config,
+			'server_config' => local_config.merge({
+        'disable_client'=>true
+      }),
 			'ip_address' => '10.10.10.51',
       'deployment_script'=>{
         'path' => 'deploy.sh',

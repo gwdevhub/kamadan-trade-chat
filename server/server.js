@@ -447,9 +447,6 @@ function init(cb) {
         });
       });
     });
-    app.get('/', function(req,res) {
-      res.send(renderFile(__dirname+'/index.html',{req:req}));
-    });
     app.get('/sitemap',function(req,res) {
       var sitemap = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
       var urls = ['zkey','ecto','bds','conset','kuunavang','vizu'];
@@ -483,6 +480,9 @@ function init(cb) {
         console.error(e);
         res.send(renderFile(__dirname+'/index.html',{req:req,messages:[],search_term:req.params.term}));
       });
+    });
+    app.get('/trader_quotes',function(req,res) {
+      res.json(global.config.current_trade_prices);
     });
     app.get('/pricing_history/:model_id/:from/:to', function(req,res) {
       var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
@@ -532,7 +532,9 @@ function init(cb) {
       return res.send(Trader.cached_message_log);
     });
     
-    
+    app.get(['/','/:trader_item'], function(req,res) {
+      res.send(renderFile(__dirname+'/index.html',{req:req}));
+    });
 		return app;
 	}
   function dropSocket(client) {

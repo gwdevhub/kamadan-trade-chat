@@ -1,28 +1,59 @@
 var GuildWars = {
   getItemName:function(model_id) {
-    if(this.common_materials[model_id])
-      return this.common_materials[model_id].name;
-    if(this.rare_materials[model_id])
-      return this.rare_materials[model_id].name;
-    return "Unknown Item";
+    var item = this.getItem(model_id);
+    return item ? item.name : "Unknown Item";
+  },
+  getItem:function(string) {
+    // Get by model id
+    var numCheck = parseInt(string);
+    if(!isNaN(numCheck)) {
+      if(this.common_materials[numCheck])
+        return this.common_materials[numCheck];
+      if(this.rare_materials[numCheck])
+        return this.rare_materials[numCheck];
+      return null;
+    }
+    // Search by name
+    string = string.toLowerCase().trim().replace(/s$/,'');
+    var checkItem = function(mat) {
+      var name = mat.name.toLowerCase();
+      if(name == string)
+        return mat;
+      name = name.replace(/^(bolt|glob|vial|lump) of /,'').replace(/ingot/,'');
+      if(name == string)
+        return mat;
+      if(mat.aliases && mat.aliases.indexOf(string) != -1)
+        return mat;
+      return null;
+    }
+    var found = null;
+    for(var i in this.common_materials) {
+      if(found = checkItem(this.common_materials[i]))
+        return found;
+    }
+    for(var i in this.rare_materials) {
+      if(found = checkItem(this.rare_materials[i]))
+        return found;
+    }
+    return null;
   },
   common_materials:{
     // Common mats
     921:{name:"Bones",per:10},
-    925:{name:"Bolt of Cloth",per:10},
-    929:{name:"Glittering Dust",per:10},
+    925:{name:"Bolt of Cloth", aliases:['cloth'], per:10},
+    929:{name:"Glittering Dust", aliases:['dust'], per:10},
     933:{name:"Feathers",per:10},
-    934:{name:"Plant Fibers",per:10},
+    934:{name:"Plant Fibers", aliases:['fiber'], per:10},
     940:{name:"Tanned Hide Square",per:10},
-    946:{name:"Wood Plank",per:10},
-    948:{name:"Iron Ingot",per:10},
+    946:{name:"Wood Plank", aliases:['wood'], per:10},
+    948:{name:"Iron Ingot", aliases:['iron'], per:10},
     953:{name:"Scale",per:10},
     954:{name:"Chitin Fragment",per:10},
-    955:{name:"Granite Slab",per:10}
+    955:{name:"Granite Slab", aliases:['granite'], per:10}
   },
   rare_materials:{
     // Rare mats
-    6532:{name:"Amber Chunk"},
+    6532:{name:"Amber Chunk", aliases:['amber']},
     927:{name:"Bolt of Damask"},
     926:{name:"Bolt of Linen"},
     928:{name:"Bolt of Silk"},
@@ -30,15 +61,15 @@ var GuildWars = {
     935:{name:"Diamond"},
     943:{name:"Elonian Leather Square"},
     941:{name:"Fur Square"},
-    930:{name:"Glob of Ectoplasm"},
-    6533:{name:"Jadeite Shard"},
-    942:{name:"Leather Square"},
+    930:{name:"Glob of Ectoplasm", aliases:['ecto']},
+    6533:{name:"Jadeite Shard", aliases:['jade']},
+    942:{name:"Leather Square", aliases:['leather']},
     922:{name:"Lump of Charcoal"},
     923:{name:"Monstrous Claw"},
     931:{name:"Monstrous Eye"},
     932:{name:"Monstrous Fang"},
-    945:{name:"Obsidian Shard"},
-    936:{name:"Onyx Gemstone"},
+    945:{name:"Obsidian Shard", aliases:['shard','obby']},
+    936:{name:"Onyx Gemstone", aliases:['onyx']},
     951:{name:"Roll of Parchment"},
     952:{name:"Roll of Vellum"},
     937:{name:"Ruby"},
@@ -94,6 +125,10 @@ var common_materials_sorted = Object.keys(GuildWars.common_materials).sort(funct
 var rare_materials_sorted = Object.keys(GuildWars.rare_materials).sort(function(a,b) {
   return GuildWars.rare_materials[a].name.localeCompare(GuildWars.rare_materials[b].name) > 0;
 });
+for(var i in GuildWars.common_materials)
+  GuildWars.common_materials[i].model_id = i;
+for(var i in GuildWars.rare_materials)
+  GuildWars.rare_materials[i].model_id = i;
 // Items to show in top bar for price quotes.
 var price_quote_summary_items = {930:1,933:1,934:1};
 for(var i in GuildWars.item_icons) {
@@ -391,7 +426,12 @@ var KamadanClient = {
     this.redrawTraderQuotes();
     if(this.getSearchTerm().length)
       this.search();
-    if(/showing-prices/.test(this.listings_div.className)) {
+    if(window.trader_item) {
+      var item = GuildWars.getItem(window.trader_item);
+      if(item)
+        this.showPricingHistory(item.model_id);
+    }
+    else if(/showing-prices/.test(this.listings_div.className)) {
       this.showPricingHistory();
     }
   },

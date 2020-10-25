@@ -7,13 +7,16 @@ var exec = exec || require('child_process').exec;
 
 var ServerConfig = require(__dirname+'/../../kamadan-trade-client/ServerConfig.class.js');
 
+if(ServerConfig.get('disable_client'))
+  return Promise.resolve();
+
 var kamadan_gw_login = ServerConfig.get('gw_kamadan_login');
 if(kamadan_gw_login && kamadan_gw_login.email && kamadan_gw_login.email.trim().length) {
   exec('ps -elf | grep "[-]email \"'+kamadan_gw_login.email+'\""',function(a,stdout,c) {
     if(stdout.indexOf('-email') != -1)
       return;// console.log("Guild Wars client already running!\n"+stdout);
     let cmd = 'cd '+__dirname+'/../../kamadan-trade-client \
-    && sudo sh run_client.sh "'+kamadan_gw_login.email+'" "'+kamadan_gw_login.password+'" "'+kamadan_gw_login.character+'" 449 0 > /dev/null 2>&1';
+    && sudo sh run_client.sh "'+kamadan_gw_login.email+'" "'+kamadan_gw_login.password+'" "'+kamadan_gw_login.character+'" 248 3 > /dev/null 2>&1';
     console.log("Starting Kamadan Guild Wars client!\n"+cmd);
     exec(cmd);
   });

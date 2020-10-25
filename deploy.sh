@@ -43,6 +43,16 @@ sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
   sudo apt-get update && sudo apt-get install -y apt-transport-https build-essential curl;
   sudo curl -sL https://deb.nodesource.com/setup_12.x | sudo bash -;
   sudo apt-get install -y ${REQUIRED_PACKAGES});
+
+# Install wine
+# sudo dpkg -s "wine-stable" 2>/dev/null >/dev/null || (
+  # printf "${RED}*** Installing wine ***${NC}\n";
+  # sudo dpkg --add-architecture i386;
+  # wget -nc https://dl.winehq.org/wine-builds/winehq.key;
+  # sudo apt-key add winehq.key;
+  # sudo add-apt-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ focal main';
+  # sudo apt install -y --install-recommends winehq-stable
+# )
   
 # On Ubuntu > 16.04, run chronyd -q to make sure the time is up-to-date
 #sudo chronyd -q
@@ -92,6 +102,7 @@ cmp -s "${PROJECT_CODE_FOLDER}/server/package.json" "./node_modules/package.json
 # Combine all of the above commands into a single string. touch /tmp/forever.log && forever start -a -l /tmp/forever.log -o /tmp/forever.log -e /tmp/forever.log server.js
 
 printf "${RED}*** ${PROJECT_CONTAINER}: Restarting server.js (forever stopall && forever start server.js) ***${NC}\n"; 
-sudo forever stopall; 
-touch /tmp/forever.log; 
+sudo forever stop ${PROJECT_CODE_FOLDER}/server/server.js; 
+sudo touch /tmp/forever.log; 
+sudo chmod 777 /tmp/forever.log;
 sudo forever start -a -l /tmp/forever.log -s -c "node --expose-gc" ${PROJECT_CODE_FOLDER}/server/server.js

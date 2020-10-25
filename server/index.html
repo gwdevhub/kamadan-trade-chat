@@ -97,6 +97,9 @@
     </div>
     <div id="notify_popup" class="notify_info"></div>
     <script>
+      {{#with req.params.trader_item}}
+        window.trader_item = "{{this}}";
+      {{/with}}
       {{#if is_presearing}}
       window.client_player_name = "Larry Logsalot";
       {{else}}
