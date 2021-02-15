@@ -646,7 +646,7 @@ function getPricingHistoryJSON(req,res) {
   await preload();
   // Check/renew SSL certificates daily.
   //repeat_script('renew_ssl_certificates.js',864e5);
-  //repeat_script('run_client.js',10000);
+  repeat_script('run_client.js',10000);
   
   await KamadanTrade.init();
   KamadanTrade.cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
