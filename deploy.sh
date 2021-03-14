@@ -27,10 +27,25 @@ else
 fi
 printf "${RED}*** Connected ssh client is ${SSH_IP} ***${NC}\n";
 
-REQUIRED_PACKAGES='apt-transport-https build-essential curl chrony mariadb-server software-properties-common tesseract-ocr nodejs git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1 certbot'
+REQUIRED_PACKAGES='apt-transport-https build-essential curl chrony mariadb-server software-properties-common tesseract-ocr git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1 certbot'
 
 sudo ln -sf /usr/share/zoneinfo/${SERVER_TIMEZONE} /etc/localtime; 
 export NODE_ENV=production; 
+
+# Install npm
+npm -v | grep -q "[0-9]" || (sudo apt-get update && sudo apt install npm -y);
+# npm -v 2>/dev/null > /dev/null || (curl -L https://npmjs.org/install.sh | sudo sh);
+
+# Install nodejs
+# 2021-02-17: MariaDB driver doesn't play nice with node 15
+# https://github.com/mariadb-corporation/mariadb-connector-nodejs/issues/132
+NODEJS_VERSION="14" 
+node -v | grep -q "v${NODEJS_VERSION}" || (
+  # sudo apt-get remove nodejs -y;
+  sudo npm cache clean -f;
+  sudo npm install -g n;
+  sudo n ${NODEJS_VERSION};
+);
 
 # Required Packages process:
 # 1. Check to see if we're missing any of the packages listed in REQUIRED_PACKAGES string using dpkg -s command
@@ -39,9 +54,6 @@ export NODE_ENV=production;
 
 sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
   printf "${RED}*** Installing missing packages via apt-get ***${NC}\n";
-  sudo add-apt-repository ppa:certbot/certbot;
-  sudo apt-get update && sudo apt-get install -y apt-transport-https build-essential curl;
-  sudo curl -sL https://deb.nodesource.com/setup_12.x | sudo bash -;
   sudo apt-get install -y ${REQUIRED_PACKAGES});
 
 # Install wine

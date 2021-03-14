@@ -11,6 +11,7 @@ var TradeDB = {
       });
     });
   },
+  
   seed:function() {
     return Promise.all([
       this.query("CREATE TABLE `test` (
@@ -27,10 +28,13 @@ var TradeDB = {
     if(this.initted)
       return Promise.resolve();
     this.initted = true;
+    this.user = ServerConfig.get('db_user');
+    this.password = ServerConfig.get('db_password');
+    this.host = '127.0.0.1';
     this.pool = mariadb.createPool({
-      host: '127.0.0.1', 
-      user:ServerConfig.get('db_user'), 
-      password: ServerConfig.get('db_password'),
+      host: this.host, 
+      user:this.user, 
+      password: this.password,
       connectionLimit: 5
     });
     return this.seed();

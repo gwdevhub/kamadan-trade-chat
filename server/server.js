@@ -448,6 +448,7 @@ function configureWebServer(app) {
   app.post(['/','/add'],addTradeMessage);
   app.get('/trader_quotes',getTraderQuotesJSON);
   app.get('/stats',getStatsJSON);
+  app.get('/backup',getBackup);
   app.get('/pricing_history/:model_id/:from/:to', getPricingHistoryJSON);
   app.get('/s/:term/:from?/:to?', getSearchJSON);
   app.get('/u/:term/:from?/:to?', getSearchUserJSON);
@@ -456,6 +457,27 @@ function configureWebServer(app) {
   app.get('/sitemap',getSitemap);
   app.get(['/','/:trader_item'], getIndexHTML);
   return app;
+}
+async function getBackup(req,res) {
+  if(!isWhitelisted(req))
+    return res.send('nope');
+  console.log(KamadanTrade.db);
+  let file = await KamadanTrade.db.dump('kamadan');
+  if(!file)
+    return res.send('fail');
+  res.download(file);
+  setTimeout(function() {
+    if(fs.existsSync(file)) {
+      console.log("Deleting "+file);
+      try {
+        fs.unlinkSync(file);
+        console.log("Deleted");
+      } catch(e) {
+        console.error(e);
+        // silent
+      }
+    }
+  },10000);
 }
 function addTraderQuotes(req,res) {
   res.end();

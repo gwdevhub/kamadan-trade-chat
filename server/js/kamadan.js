@@ -706,7 +706,7 @@ var KamadanClient = {
           hits.unshift(json[i]);
       }
       if(hits.length)
-        this.parseSearchResults(hits);
+        this.parseSearchResults(hits, true);
     }
     if(has_new) {
       this.redrawMessages();
@@ -955,17 +955,19 @@ var KamadanClient = {
       doSave();
     this.pendingSave = setTimeout(doSave,5000);
   },
-  parseSearchResults:function(json) {
+  parseSearchResults:function(json, already_html_encoded) {
     if(json.length) {
       var push_or_unshift = this.search_results.length && this.search_results[0].t > json[0].t ? 'push' : 'unshift';
       if(push_or_unshift == 'unshift') {
         for(var i=json.length - 1; i >= 0;i--) {
-          json[i].m = json[i].m.encodeHTML();
+          if(!already_html_encoded)
+            json[i].m = json[i].m.encodeHTML();
           this.search_results.unshift(json[i]);
         }
       } else {
         for(var i=0; i < json.length;i++) {
-          json[i].m = json[i].m.encodeHTML();
+          if(!already_html_encoded)
+            json[i].m = json[i].m.encodeHTML();
           this.search_results.push(json[i]);
         }
       }

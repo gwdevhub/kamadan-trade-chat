@@ -101,3 +101,37 @@ function repeat_script(script,interval) {
     setTimeout(function() { repeat_script(script,interval) },interval);
   });
 }
+// Promosified shell command
+async function cmd(cmd, log_output = true, throw_on_fail = true) {
+  return new Promise((resolve, reject) => {    
+    let stdout_buf = '', stderr_buf='', options = {};
+    let first_arg = cmd;
+    if(typeof cmd == 'string') {
+      options.shell = true;
+      cmd = [];
+    } else {
+      first_arg = cmd.shift();
+    }
+    let spawn_args = [first_arg,cmd,options];
+    console.log(' >>> '+([first_arg].concat(cmd).join(' ')));
+    let proc    = spawn.apply(exec,spawn_args);
+    proc.stdout.on('data', function (data) {
+      if(log_output) console.log(' <<< ' +data.toString());
+      stdout_buf += data.toString();
+    });
+
+    proc.stderr.on('data', function (data) {
+      if(log_output) console.log(' <<< '+data.toString());
+      stdout_buf += data.toString();
+    });
+    if(throw_on_fail)
+      proc.on('error', reject);
+    proc.on('exit', function (code) {
+      if(code != 0 && throw_on_fail) {
+      console.log(' <<< '+stdout_buf);
+      return reject(code);
+    }
+      return resolve(stdout_buf);
+    });
+  });
+}
