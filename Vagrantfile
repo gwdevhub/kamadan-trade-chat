@@ -106,7 +106,7 @@ Machines = {
 	},
   'ManagedServers' => {
     'ramnode' => {
-      'ip_address' => '168.235.102.209',
+      'ip_address' => '107.191.98.41',
 			'server_config' => cloud_config.merge({
 				'repository_code_folder'=>'/home/ubuntu/kamadan-trade-chat',
         'is_cloud'=>1,

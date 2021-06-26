@@ -445,7 +445,8 @@ function configureWebServer(app) {
   });
   app.post('/whisper',addWhisper);
   app.post(['/trader_quotes'],addTraderQuotes);
-  app.post(['/','/add'],addTradeMessage);
+  app.post(['/','/add','/trade'],function(req,res) { return addMessage(req,res,Channel_Trade); });
+  app.post(['/local'],function(req,res) { return addMessage(req,res,Channel_All); });
   app.get('/trader_quotes',getTraderQuotesJSON);
   app.get('/stats',getStatsJSON);
   app.get('/backup',getBackup);
@@ -514,7 +515,7 @@ function addTraderQuotes(req,res) {
     });
   });
 }
-function addTradeMessage(req,res) {
+function addMessage(req, res, channel) {
   res.end();
   if(!isValidTradeSource(req)) 
     return console.error("/add called from "+getIP(req)+" - naughty!");
@@ -524,7 +525,7 @@ function addTradeMessage(req,res) {
   lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
     if(err) console.error(err);
     // Don't drop out on error; we'll unlock the stale file later
-    Trader.addMessage(req,timestamp).then(function(added_message) {
+    Trader.addMessage(req,timestamp,channel).then(function(added_message) {
       if(!added_message) {
         console.log("No added message?");
         return; // Error adding message

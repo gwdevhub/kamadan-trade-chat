@@ -2,7 +2,8 @@ var live_message_log = [];
 var live_message_log_max = 100;
 var search_results_max = 25;
 
-var fs = require('fs');
+var fs = fs || require('fs');
+eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -411,7 +412,7 @@ KamadanTrade.prototype.addWhisper = function(req,timestamp) {
   }
   return Promise.resolve();
 }
-KamadanTrade.prototype.addMessage = function(req,timestamp) {
+KamadanTrade.prototype.addMessage = function(req,timestamp, channel) {
   var message = this.parseMessageFromRequest(req,timestamp);
   if(message instanceof Error)
     return Promise.reject(message);
@@ -421,6 +422,11 @@ KamadanTrade.prototype.addMessage = function(req,timestamp) {
   if(quarantined) {
     console.log("Message hit quarantine: "+message.m);
     table = this.table_prefix+'quarantine';
+  }
+  // Local messages are checked for quarantine, then discarded.
+  if(!quarantined && channel != Channel_Trade) {
+    console.log("Non-trade message received:"+message.m);
+    return Promise.resolve(false);
   }
   
   // Avoid spam by the same user (or multiple trade message sources!)
@@ -457,6 +463,7 @@ KamadanTrade.prototype.addMessage = function(req,timestamp) {
       self.last_message = message;
       return resolve(message);
     };
+
     self.init().then(function() {
       // If this user has advertised this message in the last 14 weeks, just update it.
       return self.db.query("SELECT t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",[message.s,message.m,message.t - (864e5 * 14)]).then(function(res) {
