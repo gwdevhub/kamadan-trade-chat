@@ -375,6 +375,8 @@ KamadanTrade.prototype.parseMessageFromRequest = function(req,timestamp) {
   message.m = message.m.replace(/\\(\\|\[|\])/g,'$1');
   // 2020-03-06: RMT adding garbage to the end of their message
   message.m = message.m.replace(/----[0-9]+$/,'');
+  // 2021-10-27: Bots sending random numbers to trade chat
+  message.m = message.m.replace(/^[0-9]+$/,'');
   if(!message.m.length)
     return new Error("Message is empty");
   return message;
