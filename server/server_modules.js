@@ -38,7 +38,13 @@ if(!global.server_modules_included) {
 
   global.serverScripts = {};
 
-  var last_gc = 0;
+  function log_error(e) {
+    console.error(e);
+    console.error(e.stack);
+  }
+
+
+  let last_gc = 0;
   function garbage_collect() {
     let t = Date.now();
     if(t - last_gc < 60000)
@@ -108,7 +114,7 @@ if(!global.server_modules_included) {
       console.error("ERROR: "+err);
     });
   }
-  var periodicScripts = {};
+  let periodicScripts = {};
   function repeat_script(script,interval) {
     if(periodicScripts[script] && periodicScripts[script].interval < interval)
       return console.log(script+" already queued"); // Already queued

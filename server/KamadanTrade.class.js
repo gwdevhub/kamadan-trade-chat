@@ -26,142 +26,113 @@ KamadanTrade.prototype.housekeeping = function() {
       delete this.last_message_by_user[i];
   }
 };
-KamadanTrade.prototype.addTraderPrices = function(json) {
-  var self = this;
-  return new Promise(function(resolve,reject) {
-    self.getTraderPrices().then(function(current_prices) {
-      var updated_prices = [];
-      var models_done = {buy:{},sell:{}};
-      var return_prices = {buy:{},sell:{}};
-      for(var key in models_done) {
-        for(var i in json[key]) {
-          var current = current_prices[key][json[key][i].m];
-          if(models_done[key][json[key][i].m])
-            continue;
-          models_done[key][json[key][i].m] = 1;
-          if(!current || current.p != json[key][i].p) {
-            updated_prices.push({m:json[key][i].m,p:json[key][i].p,t:json[key][i].t,s:key == 'buy' ? 0 : 1});
-          }
-        }
+KamadanTrade.prototype.addTraderPrices = async function(json) {
+
+  let current_prices = await this.getTraderPrices();
+  let updated_prices = [];
+  let models_done = {buy:{},sell:{}};
+  let return_prices = {buy:{},sell:{}};
+  for(let key in models_done) {
+    for(let i in json[key]) {
+      let current = current_prices[key][json[key][i].m];
+      if(models_done[key][json[key][i].m])
+        continue;
+      models_done[key][json[key][i].m] = 1;
+      if(!current || current.p != json[key][i].p) {
+        updated_prices.push({m:json[key][i].m,p:json[key][i].p,t:json[key][i].t,s:key == 'buy' ? 0 : 1});
       }
-      if(!updated_prices.length) {
-        console.log("No prices updated");
-        return resolve(false);
-      }
-      var sql_args = [];
-      var sql_insert = [];
-      // 1. Insert ignore into trader_items table
-      for(var i in updated_prices) {
-        sql_args.push(updated_prices[i].m);
-        sql_insert.push('(?)');
-      }
-      self.db.query("INSERT IGNORE INTO trader_items (m) VALUES "+sql_insert.join(','),sql_args).catch(function(e) {
-        console.log("There was an error inserting into trader_items");
-        console.error(e);
-      }).then(function(res) {
-        // 2. Fetch back a listing of the items to find the unique id
-        self.db.query("SELECT * from trader_items").then(function(trader_items) {
-          var item_id_by_modstruct = {};
-          for(var i=0;i<trader_items.length;i++) {
-            item_id_by_modstruct[trader_items[i].m] = trader_items[i].i;
-          }
-          // 3. Do the insert into trader_prices
-          sql_args = [];
-          sql_insert = [];
-          for(var i in updated_prices) {
-            sql_args.push(item_id_by_modstruct[updated_prices[i].m]);
-            sql_args.push(updated_prices[i].p);
-            sql_args.push(updated_prices[i].t);
-            sql_args.push(updated_prices[i].s);
-            sql_insert.push('(?,?,?,?)');
-            if(updated_prices[i].s) {
-              return_prices.sell[updated_prices[i].m] = {p:updated_prices[i].p,t:updated_prices[i].t};
-            } else {
-              return_prices.buy[updated_prices[i].m] = {p:updated_prices[i].p,t:updated_prices[i].t};
-            }
-          }
-          self.db.query("INSERT INTO trader_prices2 (i,p,t,s) VALUES "+sql_insert.join(','),sql_args).then(function(res) {
-            console.log("Trader prices updated: "+res.affectedRows);
-          }).catch(function(e) {
-            console.log("There was an error inserting into trader_prices");
-            console.error(e);
-          }).finally(function() {
-            resolve(return_prices);
-          });
-        })        
-      });
-      
-    });
-  });
-  
+    }
+  }
+  if(!updated_prices.length) {
+    console.log("No prices updated");
+    return false;
+  }
+  let sql_args = [];
+  let sql_insert = [];
+  // 1. Insert ignore into trader_items table
+  for(let i in updated_prices) {
+    sql_args.push(updated_prices[i].m);
+    sql_insert.push('(?)');
+  }
+  await this.db.query("INSERT IGNORE INTO trader_items (m) VALUES "+sql_insert.join(','),sql_args);
+  // 2. Fetch back a listing of the items to find the unique id
+  let trader_items = await this.db.query("SELECT * from trader_items");
+  let item_id_by_modstruct = {};
+  for(let i=0;i<trader_items.length;i++) {
+    item_id_by_modstruct[trader_items[i].m] = trader_items[i].i;
+  }
+  // 3. Do the insert into trader_prices
+  sql_args = [];
+  sql_insert = [];
+  for(let i in updated_prices) {
+    sql_args.push(item_id_by_modstruct[updated_prices[i].m]);
+    sql_args.push(updated_prices[i].p);
+    sql_args.push(updated_prices[i].t);
+    sql_args.push(updated_prices[i].s);
+    sql_insert.push('(?,?,?,?)');
+    if(updated_prices[i].s) {
+      return_prices.sell[updated_prices[i].m] = {p:updated_prices[i].p,t:updated_prices[i].t};
+    } else {
+      return_prices.buy[updated_prices[i].m] = {p:updated_prices[i].p,t:updated_prices[i].t};
+    }
+  }
+  let res = await this.db.query("INSERT INTO trader_prices2 (i,p,t,s) VALUES "+sql_insert.join(','),sql_args);
+  console.log("Trader prices updated: "+res.affectedRows);
+  return return_prices;
 }
-KamadanTrade.prototype.getTraderPrices = function() {
-  var self = this;
-  var result = {buy:{},sell:{}};
-  return new Promise(function(resolve,reject) {
-    var query = "SELECT t.p,t.t,t.s, i.m \
+KamadanTrade.prototype.getTraderPrices = async function() {
+  let result = {buy:{},sell:{}};
+  let query = "SELECT t.p,t.t,t.s, i.m \
             FROM (SELECT MAX(t) AS t, i, s\
               FROM trader_prices2 t\
               GROUP BY i,s) Z \
             JOIN trader_prices2 t ON Z.i = t.i\
               AND Z.t = t.t\
             JOIN trader_items i ON i.i = t.i";
-    self.db.query(query).then(function(rows) {
-      for(var i=0;i<rows.length;i++) {
-        var res = {p:rows[i].p,t:rows[i].t};
-        if(rows[i].s) {
-          result.sell[rows[i].m] = res;
-        } else {
-          result.buy[rows[i].m] = res;
-        }
-      }
-    }).finally(function() {
-      return resolve(result);
-    });
-  });
-  
+  let rows = await this.db.query(query)
+  for(let i=0;i<rows.length;i++) {
+    let res = {p:rows[i].p,t:rows[i].t};
+    if(rows[i].s) {
+      result.sell[rows[i].m] = res;
+    } else {
+      result.buy[rows[i].m] = res;
+    }
+  }
+  return result;
 }
-KamadanTrade.prototype.getPricingHistory = function(model_id,from,to, average_interval_minutes) {
-  var self = this;
-  var result = [];
-  return new Promise(function(resolve,reject) {
-    from = parseInt(from.substr(0,10),10);
-    to = parseInt(to.substr(0,10),10);
-    if(typeof average_interval_minutes != 'number')
-      average_interval_minutes = 60;
-    var interval_seconds = parseInt(average_interval_minutes * 60);
-    var interval_rounded = "floor(t/("+interval_seconds+"))*"+interval_seconds;
-    
-    // Original query, includes every point.
-    var query = "SELECT i.m,t.p,t.t,t.s\
+KamadanTrade.prototype.getPricingHistory = async function(model_id,from,to, average_interval_minutes) {
+  from = parseInt(from.substr(0,10),10);
+  to = parseInt(to.substr(0,10),10);
+  if(typeof average_interval_minutes != 'number')
+    average_interval_minutes = 60;
+  let interval_seconds = average_interval_minutes * 60;
+  let interval_rounded = "floor(t/("+interval_seconds+"))*"+interval_seconds;
+  // Original query, includes every point.
+  let query = "SELECT i.m,t.p,t.t,t.s\
               FROM trader_items i\
               JOIN trader_prices2 t ON i.i = t.i\
                 AND t.t >= "+from+" and t.t <= "+to+"\
               WHERE i.m = ?\
               ORDER BY t DESC";
-    //var query = "SELECT m,p,t,s FROM trader_prices2 WHERE m = "+model_id+" AND t >= "+from+" and t <= "+to+" ORDER BY t DESC";
-    
-    // Rounded to average_interval_minutes
-    /*var query = "SELECT * FROM ((SELECT \
-              "+interval_rounded+" AS t,\
-              m,s,round(avg(p)) AS p \
-              FROM trader_prices \
-              WHERE m = "+model_id+"\
-              AND t >= "+from+"\
-              AND t <= "+to+"\
-              GROUP BY m,s,"+interval_rounded+" DESC)\
-              UNION\
-              (SELECT \
-              t,m,s,p FROM trader_prices WHERE m = "+model_id+"\
-              AND t >= "+from+"\
-              AND t <= "+to+"\
-              GROUP BY m,s,t DESC LIMIT 1)) Z ORDER BY t desc;";*/
-    self.db.query(query, model_id.trim()).then(function(rows) {
-      result = rows;
-    }).finally(function() {
-      return resolve(result);
-    });
-  });
+  //let query = "SELECT m,p,t,s FROM trader_prices2 WHERE m = "+model_id+" AND t >= "+from+" and t <= "+to+" ORDER BY t DESC";
+
+  // Rounded to average_interval_minutes
+  /*let query = "SELECT * FROM ((SELECT \
+            "+interval_rounded+" AS t,\
+            m,s,round(avg(p)) AS p \
+            FROM trader_prices \
+            WHERE m = "+model_id+"\
+            AND t >= "+from+"\
+            AND t <= "+to+"\
+            GROUP BY m,s,"+interval_rounded+" DESC)\
+            UNION\
+            (SELECT \
+            t,m,s,p FROM trader_prices WHERE m = "+model_id+"\
+            AND t >= "+from+"\
+            AND t <= "+to+"\
+            GROUP BY m,s,t DESC LIMIT 1)) Z ORDER BY t desc;";*/
+
+  return await this.db.query(query, model_id.trim());
 }
 
 KamadanTrade.prototype.init = function() {
@@ -261,21 +232,22 @@ KamadanTrade.prototype.quarantineCheck = function(message) {
   }
   return false;
 }
-KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
-  var self = this;
+KamadanTrade.prototype.search = async function(term,from_unix_ms,to_unix_ms) {
   term = ((term || '')+'').toLowerCase().trim();
   if(!term.length)
-    return Promise.resolve(this.live_message_log);
-  this.db.query("INSERT INTO "+self.table_prefix+"searchlog (term,last_search,count) VALUES (?,?,1) ON DUPLICATE KEY UPDATE last_search = ?, count = count+1",[term,Date.now(),Date.now()]);
-  var by_user = false;
+    return this.live_message_log;
+  // No need to wait for this one
+  this.db.query("INSERT INTO "+this.table_prefix+"searchlog (term,last_search,count) VALUES (?,?,1) ON DUPLICATE KEY UPDATE last_search = ?, count = count+1",[term,Date.now(),Date.now()])
+      .catch(function(e) {console.error(e);});
+  let by_user = false;
   if(term.indexOf('user:') == 0) {
     by_user = true;
     term = term.substring(5);
   }
-  var to_date = new Date();
-  var from_date;
-  var latest_year;
-  var earliest_year = 2015;
+  let to_date = new Date();
+  let from_date;
+  let latest_year;
+  let earliest_year = 2015;
   if(typeof to_unix_ms != 'undefined' && to_unix_ms != 0) {
     console.log("to_unix_ms "+to_unix_ms);
     to_unix_ms = (to_unix_ms+'').trim();
@@ -297,73 +269,73 @@ KamadanTrade.prototype.search = function(term,from_unix_ms,to_unix_ms) {
       throw "Invalid to date of "+to_unix_ms;
   }
   console.log("Searching messages for "+term+", from "+from_date+" to "+to_date);
-  return this.init().then(function() {
-    var args = [];
-    var where_clause = '';
-    if(by_user) {
-      // Search by user
-      where_clause = " WHERE s = ? ";
-      args.push(term);
-    } else {
-      // Split string by spaces
-      var keywords = term.split(' ');
-      var incwords = [];
-      var exwords = [];
-      for(var i=0;i<keywords.length;i++) {
-        switch(keywords[i][0]) {
-          case '!':
-            if(keywords[i].length > 1)
-              exwords.push(keywords[i].substr(1));
+  await this.init();
+  let args = [];
+  let where_clause = '';
+  if(by_user) {
+    // Search by user
+    where_clause = " WHERE s = ? ";
+    args.push(term);
+  } else {
+    // Split string by spaces
+    let keywords = term.split(' ');
+    let incwords = [];
+    let exwords = [];
+    for(let i=0;i<keywords.length;i++) {
+      switch(keywords[i][0]) {
+        case '!':
+          if(keywords[i].length > 1)
+            exwords.push(keywords[i].substr(1));
           break;
-          default:
-            incwords.push(keywords[i]);
+        default:
+          incwords.push(keywords[i]);
           break;
-        }
-      }
-      // Include these words...
-      for(var i=0;i<incwords.length;i++) {
-        where_clause += where_clause.length ? " AND" : " WHERE";
-        where_clause+= " m LIKE ? ";
-        args.push('%'+incwords[i]+'%');
-      }
-      // ...but exclude these ones.
-      for(var i=0;i<exwords.length;i++) {
-        where_clause += where_clause.length ? " AND" : " WHERE";
-        where_clause+= " m NOT LIKE ? ";
-        args.push('%'+exwords[i]+'%');
       }
     }
-    var rows_final = [];
-    var searchYear = function(year) {
-      if(year < earliest_year)
-        return Promise.resolve(rows_final);
-      var where = where_clause;
-      if(year == earliest_year && from_date)
-        where += " AND t > "+from_date.getTime();
-      if(year == latest_year && to_date)
-        where += " AND t < "+to_date.getTime();
-      var sql = "SELECT t,s,m FROM kamadan."+self.table_prefix+year+" "+where+" ORDER BY t DESC LIMIT "+search_results_max;
-      console.log(sql);
-      return self.db.query(sql,args).then(function(rows) {
-        for(var i in rows) {
-          rows_final.push(rows[i]);
-        }
-        if(rows_final.length < search_results_max && latest_year - year < 3) // NOTE: search back 3 years max
-          return searchYear(year-1);
-        return Promise.resolve(rows_final);
-      });
-    };
-    return searchYear(latest_year);
-  });
+    // Include these words...
+    for(let i=0;i<incwords.length;i++) {
+      where_clause += where_clause.length ? " AND" : " WHERE";
+      where_clause+= " m LIKE ? ";
+      args.push('%'+incwords[i]+'%');
+    }
+    // ...but exclude these ones.
+    for(let i=0;i<exwords.length;i++) {
+      where_clause += where_clause.length ? " AND" : " WHERE";
+      where_clause+= " m NOT LIKE ? ";
+      args.push('%'+exwords[i]+'%');
+    }
+  }
+  let rows_final = [];
+  let db = this.db;
+  let self=this;
+  let searchYear = async function(year) {
+    if(year < earliest_year)
+      return rows_final;
+    let where = where_clause;
+    if(year == earliest_year && from_date)
+      where += " AND t > "+from_date.getTime();
+    if(year == latest_year && to_date)
+      where += " AND t < "+to_date.getTime();
+    let sql = "SELECT t,s,m FROM kamadan."+self.table_prefix+year+" "+where+" ORDER BY t DESC LIMIT "+search_results_max;
+    //console.log(sql);
+    let rows = await db.query(sql,args);
+    for(let i in rows) {
+      rows_final.push(rows[i]);
+    }
+    if(rows_final.length < search_results_max && latest_year - year < 3) // NOTE: search back 3 years max
+      return await searchYear(year-1);
+    return rows_final;
+  };
+  return await searchYear(latest_year);
 }
 KamadanTrade.prototype.parseMessageFromRequest = function(req,timestamp) {
-  var body = req.body || '';
+  let body = req.body || '';
   if(typeof body == 'string') {
     try {
       body = JSON.parse(body);
     } catch(e) {}
   }
-  var message = {
+  let message = {
     m:((body.m || body.message || '')+'').trim(),
     s:((body.s || body.sender || '')+'').trim(),
     t:timestamp
@@ -381,46 +353,41 @@ KamadanTrade.prototype.parseMessageFromRequest = function(req,timestamp) {
     return new Error("Message is empty");
   return message;
 }
-KamadanTrade.prototype.addWhisper = function(req,timestamp) {
-  var message = this.parseMessageFromRequest(req,timestamp);
-  var self = this;
+KamadanTrade.prototype.addWhisper = async function(req,timestamp) {
+  let message = this.parseMessageFromRequest(req,timestamp);
   if(message instanceof Error)
-    return Promise.reject(message);
+    return message;
   console.log("Whisper received from "+message.s+": "+message.m);
-  self.db.query("INSERT INTO whispers (t,s,m) values (?,?,?)",[message.t,message.s,message.m]);
+  this.db.query("INSERT INTO whispers (t,s,m) values (?,?,?)",[message.t,message.s,message.m]);
   // Do something with this whisper
-  var matches;
+  let matches;
   if(matches = /delete ([0-9]{13})/i.exec(message.m)) {
     // Someone wants to delete a trade message.
-    var date = new Date(parseInt(matches[1],10));
+    let date = new Date(parseInt(matches[1],10));
     if(date.getUTCFullYear() < 2015 || date.getTime() > Date.now())
-      return Promise.reject(new Error("Player "+message.s+" wants to delete message "+matches[1]+", but this is an invalid date"));
-    var r = date.getTime();
-    return new Promise(function(resolve,reject) {
-      self.db.query("INSERT INTO "+self.table_prefix+"deleted SELECT * FROM "+self.table_prefix+date.getUTCFullYear()+" WHERE t = ? AND s = ?",[r,message.s]).then(function(res) {
-        if(!res.affectedRows) 
-          return reject(new Error("Player "+message.s+" wants to delete message "+matches[1]+", but no rows were affected"));
-        self.db.query("DELETE FROM "+self.table_prefix+date.getUTCFullYear()+" WHERE t = ? AND s = ?",[r,message.s]);
-        for(var i=0;i < self.live_message_log.length;i++) {
-          if(self.live_message_log[i].t == r) {
-            self.live_message_log.splice(i,1);
-            break;
-          }
-        }
-        // Success; return object with "r" set to timestamp of message to remove via connected clients.
-        return resolve({r:r});
-      });
-    });
+      throw "Player "+message.s+" wants to delete message "+matches[1]+", but this is an invalid date";
+    let r = date.getTime();
+    let res = await this.db.query("INSERT INTO "+this.table_prefix+"deleted SELECT * FROM "+this.table_prefix+date.getUTCFullYear()+" WHERE t = ? AND s = ?",[r,message.s]);
+    if(!res.affectedRows)
+      throw "Player "+message.s+" wants to delete message "+matches[1]+", but no rows were affected";
+    await this.db.query("DELETE FROM "+this.table_prefix+date.getUTCFullYear()+" WHERE t = ? AND s = ?",[r,message.s]);
+    for(let i=0;i < this.live_message_log.length;i++) {
+      if(this.live_message_log[i].t == r) {
+        this.live_message_log.splice(i,1);
+        break;
+      }
+    }
+    // Success; return object with "r" set to timestamp of message to remove via connected clients.
+    return {r:r};
   }
-  return Promise.resolve();
 }
-KamadanTrade.prototype.addMessage = function(req,timestamp, channel) {
-  var message = this.parseMessageFromRequest(req,timestamp);
+KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
+  let message = this.parseMessageFromRequest(req,timestamp);
   if(message instanceof Error)
-    return Promise.reject(message);
+    throw message;
   //console.log("Trade message received OK");
-  var quarantined = this.quarantineCheck(message);
-  var table = this.table_prefix+(new Date()).getUTCFullYear();
+  let quarantined = this.quarantineCheck(message);
+  let table = this.table_prefix+(new Date()).getUTCFullYear();
   if(quarantined) {
     console.log("Message hit quarantine: "+message.m);
     table = this.table_prefix+'quarantine';
@@ -428,99 +395,59 @@ KamadanTrade.prototype.addMessage = function(req,timestamp, channel) {
   // Local messages are checked for quarantine, then discarded.
   if(!quarantined && channel != Channel_Trade) {
     console.log("Non-trade message received:"+message.m);
-    return Promise.resolve(false);
+    return false;
   }
   
   // Avoid spam by the same user (or multiple trade message sources!)
-  var last_user_msg = this.last_message_by_user[message.s];
+  let last_user_msg = this.last_message_by_user[message.s];
   if(last_user_msg && last_user_msg.m.removePunctuation() == message.m.removePunctuation()) {
     if(Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
       console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"ms diff");
-      return Promise.resolve(false);
+      return false;
     }
     // Avoid spammers adding random chars to their trade message by consolidating it.
     message.m = last_user_msg.m;
   }
-  var self = this;
-
-  // database message log
-  return new Promise(function(resolve,reject) {
-    var done = function() {
-      self.last_message_by_user[message.s] = message;
-      if(quarantined)
-        return resolve(false);
-      // live message log
-      self.live_message_log.unshift(message);
-      if(message.r) {
-        for(var i=0;i < self.live_message_log.length;i++) {
-          if(self.live_message_log[i].t == message.r) {
-            self.live_message_log.splice(i,1);
-            break;
-          }
-        }
-      }
-      while(self.live_message_log.length > live_message_log_max) {
-        self.live_message_log.pop();
-      }
-      self.last_message = message;
-      return resolve(message);
-    };
-
-    self.init().then(function() {
-      // If this user has advertised this message in the last 14 weeks, just update it.
-      return self.db.query("SELECT t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",[message.s,message.m,message.t - (864e5 * 14)]).then(function(res) {
-        if(res.length) {
-          message.r = res[0].t;
-          return self.db.query("UPDATE "+table+" SET t = ? WHERE t = ?",[message.t,res[0].t]).then(function() {
-            return done();
-          });
-        }
-        // None updated; INSERT.
-        return self.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]).then(function(res) {
-          return done();
-        }); 
-      });
-    });
-  });
-}
-KamadanTrade.prototype.getMessagesByUser = function(term,from_unix_ms,to_unix_ms) {
-  return this.search.apply(this,arguments);
-  var self = this;
-  term = ((term || '')+'').toLowerCase().trim();
-  if(!term.length)
-    return Promise.resolve([]);
-  var year = (new Date()).getUTCFullYear();
-  if(earlier_than) {
-    earlier_than = parseInt(earlier_than,10);
-    year = (new Date(earlier_than)).getUTCFullYear();
+  await this.init();
+  let res = await this.db.query("SELECT t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",[message.s,message.m,message.t - (864e5 * 14)]);
+  if(res.length) {
+    message.r = res[0].t;
+    await this.db.query("UPDATE "+table+" SET t = ? WHERE t = ?",[message.t,res[0].t]);
+  } else {
+    await this.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]);
   }
-  console.log("Searching user message for "+term);
-  return this.init().then(function() {
-    return self.db.query("SELECT t,s,m FROM kamadan."+self.table_prefix+year+" WHERE s LIKE ? ORDER BY t DESC LIMIT "+live_message_log_max,[term])
-      .then(function(rows) {
-        return Promise.resolve(rows || []);
-      });
-  });
+  this.last_message_by_user[message.s] = message;
+  if(quarantined)
+    return false;
+  // live message log
+  this.live_message_log.unshift(message);
+  if(message.r) {
+    for(let i=0;i < this.live_message_log.length;i++) {
+      if(this.live_message_log[i].t == message.r) {
+        this.live_message_log.splice(i,1);
+        break;
+      }
+    }
+  }
+  while(this.live_message_log.length > live_message_log_max) {
+    this.live_message_log.pop();
+  }
+  this.last_message = message;
+  return message;
 }
 KamadanTrade.prototype.getMessagesSince = function(h) {
-  var slice_end = 0;
+  let slice_end = 0;
   while(slice_end < this.live_message_log.length && this.live_message_log[slice_end].h != h) {
     slice_end++;
   }
   return this.live_message_log.slice(0,slice_end);
 }
-KamadanTrade.prototype.seedLiveMessageLog = function() {
-  var self = this;
-  var year = (new Date()).getUTCFullYear();
-  return this.db.query("SELECT t, s, m\
-  FROM kamadan."+self.table_prefix+year+" \
-  ORDER BY t desc \
-  LIMIT "+live_message_log_max).then(function(rows) {
-    self.live_message_log = rows;
-    self.last_message = self.live_message_log[0];
-    console.log(self.live_message_log.length+" messages retrieved from db");
-    return Promise.resolve();
-  });
+KamadanTrade.prototype.seedLiveMessageLog = async function() {
+  let year = (new Date()).getUTCFullYear();
+  let rows = await this.db.query("SELECT t, s, m FROM kamadan."+this.table_prefix+year+" ORDER BY t desc LIMIT "+live_message_log_max);
+  this.live_message_log = rows;
+  this.last_message = this.live_message_log[0];
+  console.log(this.live_message_log.length+" messages retrieved from db");
 }
 
 if(module && module.exports) {

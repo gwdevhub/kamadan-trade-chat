@@ -10,8 +10,8 @@ global.ssl_info = {
   ssl_domains: {},
   ssl_email: ServerConfig.get('ssl_email')
 };
-var ssl_domains = ServerConfig.get('ssl_domains') || [ServerConfig.get('ssl_domain')];
-for(var i in ssl_domains) {
+let ssl_domains = ServerConfig.get('ssl_domains') || [ServerConfig.get('ssl_domain')];
+for(let i in ssl_domains) {
   if(!ssl_domains[i]) continue;
   if(!global.ssl_info.ssl_email) {
     console.error("No SSL email defined in server config (ssl_email).\nThis server won't be running in SSL."); 
@@ -33,26 +33,30 @@ for(var i in ssl_domains) {
     global.ssl_info.enabled = true;
   } catch(e) {
     console.error("There was a problem getting SSL keys for "+ssl_domains[i]+".\nThis could be because the server is local.\nThis server won't be running in SSL.");
-    console.error(e);
+    log_error(e);
   }
 }
-console.log(global.ssl_info);
+//console.log(global.ssl_info);
 
 // Valid source IP Addresses that can submit new trade messages
-var whitelisted_sources = [
+let whitelisted_sources = [
+    '1',
 '127.0.0.1',
 '10.10.10.1',
 '142.44.211.74', // Greg
-'46.64.145.237'// Me
+'81.101.64.164'// Me
 ];
-var sockets_by_ip = {
+let blacklisted_ips = [
+  //'162.158.*.*'
+];
+let sockets_by_ip = {
   
 }
-var lock_file = __dirname+'/add.lock';
+let lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
 
-var render_cache = {};
-var compile_cache = {};
+let render_cache = {};
+let compile_cache = {};
 
 Handlebars.registerHelper("relativeTime", function(t) {
   return (new Date(t)).relativeTime();
@@ -70,11 +74,11 @@ function renderFile(file,args) {
   return compile_cache[file](args);
 }
 
-var http_server;
-var https_server;
-var ws_server;
-var wss_server;
-var last_search_by_ip = {
+let http_server;
+let https_server;
+let ws_server;
+let wss_server;
+let last_search_by_ip = {
   
 };
 
@@ -84,7 +88,7 @@ global.stats = {
   most_connected_sockets:0
 };
 function getUserAgent(req) {
-  var ua = '';
+  let ua = '';
   if(typeof req.headers == 'function')
     ua = req.headers('user-agent');
   else if(typeof req.headers != 'undefined')
@@ -94,7 +98,7 @@ function getUserAgent(req) {
   return ua;
 }
 function getIP(req) {
-  var ip = req.connection.remoteAddress;
+  let ip = req.connection.remoteAddress;
   if(typeof req.header != 'undefined')
     ip = req.header('x-forwarded-for') || ip;
   return ip.split(':').pop();
@@ -115,15 +119,32 @@ function isValidTradeSource(req) {
 function isWhitelisted(req) {
   return whitelisted_sources.indexOf(getIP(req)) != -1;
 }
+function isBlacklisted(req) {
+  let ip = getIP(req);
+  if(!ip) return true;
+  let parts = /([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/.exec(ip);
+  if(!parts) return false;
+  let wildcards = [
+    parts[1] + '.*.*.*',
+    parts[1] + '.' + parts[2] + '.*.*',
+    parts[1] + '.' + parts[2] + '.' + parts[3] + '.*',
+    ip
+  ];
+  for(let i in wildcards) {
+    if(blacklisted_ips.indexOf(wildcards[i]) != -1)
+      return true;
+  }
+  return false;
+}
 function isPreSearing(request) {
   if(typeof request.is_presearing != 'undefined')
     return request.is_presearing ? true : false;
-  var referer = request.header ? request.header('Referer') : false;
+  let referer = request.header ? request.header('Referer') : false;
   if(referer && /presear|ascalon/.test(referer))
     return true;
   if(typeof request.path == 'string' && /presear|ascalon/.test(request.path))
     return true;
-  var host = false;
+  let host = false;
   if(request.hostname) host = request.hostname;
   else if(request.headers && request.headers.host) host = request.headers.host;
   else if(request.host) host = request.host;
@@ -133,16 +154,16 @@ function isPreSearing(request) {
 }
 
 function extendedStats() {
-  var getSocketInfo = function(ws) {
-    var info = {};
-    for(var i in ws) {
+  let getSocketInfo = function(ws) {
+    let info = {};
+    for(let i in ws) {
       if(i.indexOf('_') == 0)
         continue;
       info[i] = ws[i];
     }
     return info;
   }
-  var extended_stats = {sockets:{ws:[],wss:[]}};
+  let extended_stats = {sockets:{ws:[],wss:[]}};
   if(ws_server) {
     ws_server.clients.forEach(function(client) {
       if(client == ws_server)
@@ -160,9 +181,9 @@ function extendedStats() {
   return extended_stats;
 }
 
-function updateStats() {
-  var ssl_sockets = 0;
-  var non_ssl_sockets = 0;
+async function updateStats() {
+  let ssl_sockets = 0;
+  let non_ssl_sockets = 0;
   if(ws_server) {
     ws_server.clients.forEach(function(client) {
       if(client == ws_server)
@@ -184,29 +205,27 @@ function updateStats() {
   }
   global.stats.ssl_enabled = global.ssl_info.enabled ? 1 : 0;
   global.stats.ssl_domains = [];
-  for(var i in global.ssl_info.domains) {
+  for(let i in global.ssl_info.domains) {
     if(!global.ssl_info.domains.enabled) continue;
     global.stats.ssl_domains.push(i);
   }
   global.stats.status = "active";
-  return new Promise(function(resolve,reject) {
-    KamadanDB.query("SELECT max(t) t FROM kamadan_"+(new Date()).getUTCFullYear()).then(function(res) {
-      if(!res.length)
-        return;
-      global.stats.last_trade_message = new Date(res[0].t);
-    }).catch(function(e) {
-      console.error(e);
-    }).finally(function() {
-      if(!global.stats.last_trade_message || global.stats.last_trade_message.getTime() < Date.now() - 36e5)
-        global.stats.status = "stale";
-      return resolve(global.stats);
-    });
-  });
+
+  try {
+    let res = await KamadanDB.query("SELECT max(t) t FROM kamadan_"+(new Date()).getUTCFullYear());
+    if(res.length)
+       global.stats.last_trade_message = new Date(res[0].t);
+  } catch(e) {
+    console.error(e);
+  }
+  if(!global.stats.last_trade_message || global.stats.last_trade_message.getTime() < Date.now() - 36e5)
+    global.stats.status = "stale";
+  return global.stats;
 }
 
-var KamadanTrade = new TradeModule();
+let KamadanTrade = new TradeModule();
 KamadanTrade.table_prefix = 'kamadan_';
-var AscalonTrade = new TradeModule();
+let AscalonTrade = new TradeModule();
 AscalonTrade.table_prefix = 'ascalon_';
 
 // Middleware
@@ -239,6 +258,11 @@ function configureWebsocketServer(server) {
     ws.ip = getIP(request);
     ws.ua = getUserAgent(request);
     ws.recv = 0;
+    if(isBlacklisted(request)) {
+      console.log("Rejecting blacklisted websocket "+getIP(request));
+      dropSocket(ws);
+      return;
+    }
     sockets_by_ip[ws.ip] = sockets_by_ip[ws.ip] || [];
     while(sockets_by_ip[ws.ip].length > 3) {
       // 3 socket per ip.
@@ -264,16 +288,14 @@ function configureWebsocketServer(server) {
   return websrvr;
 }
 function dropSocket(client) {
-  console.log("Dropping socket "+client.ip);
-  var i = client.ip ? sockets_by_ip[client.ip].indexOf(client) : -1;
+  console.log("Dropping socket "+client.ip+", "+client.ua);
+  var i = client.ip && sockets_by_ip[client.ip] ? sockets_by_ip[client.ip].indexOf(client) : -1;
   if(i != -1) {
     sockets_by_ip[client.ip].splice(i,1);
   }
-  try {
-    client.terminate();
-  } catch(e) {};
+  client.terminate();
 }
-function onWebsocketMessage(message,ws) {
+async function onWebsocketMessage(message,ws) {
   ws.isAlive = true;
   ws.recv++;
   if(typeof message != 'object') {
@@ -293,28 +315,26 @@ function onWebsocketMessage(message,ws) {
     ws.compression = message.compression;
   if(message.send_prices)
     ws.send_prices = 1;
-  var Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
+  let Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
   if(typeof message.since != 'undefined') {
-    var rows = Trader.getMessagesSince(message.since || 'none');
+    let rows = Trader.getMessagesSince(message.since || 'none');
     return ws.send(JSON.stringify({since:message.since, num_results:rows.length,results:rows}));
   }
   if(typeof message.query != 'undefined') {
-    var gotRows = function(rows) {
-      ws.send(JSON.stringify({query:message.query, num_results:rows.length,results:rows}));
-    }
-    if(last_search_by_ip[ws.ip] && last_search_by_ip[ws.ip] > 4) {
-      return gotRows([]); // 4 simultaneous searches per IP
-    }
-    last_search_by_ip[ws.ip] = last_search_by_ip[ws.ip] || 0;
-    last_search_by_ip[ws.ip]++;
-    return Trader.search(message.query,message.from || 0, message.to || 0).then(function(rows) {
+    let rows = [];
+    if((last_search_by_ip[ws.ip] || 0) < 4) {
+      last_search_by_ip[ws.ip] = last_search_by_ip[ws.ip] || 0;
+      last_search_by_ip[ws.ip]++;
+      try {
+        if((last_search_by_ip[ws.ip] || 0) < 4) {
+          rows = await Trader.search(message.query,message.from || 0, message.to || 0);
+        }
+      } catch(e) {
+        console.error(e);
+      }
       delete last_search_by_ip[ws.ip];
-      gotRows(rows);
-    }).catch(function(e) {
-      delete last_search_by_ip[ws.ip];
-      console.error(e);
-      gotRows([]);
-    });
+    }
+    return ws.send(JSON.stringify({query:message.query, num_results:rows.length,results:rows}));
   }
 }
 function pushPrices(prices,is_pre) {
@@ -325,11 +345,11 @@ function pushPrices(prices,is_pre) {
   }
   if(!prices.length)
     return;
-  var compressed = {
+  let compressed = {
     none:prices,
     lz:LZString.compressToUTF16(prices)
   };
-  var sent_to = 0;
+  let sent_to = 0;
   if(ws_server) {
     ws_server.clients.forEach(function each(client) {
       if (client == ws_server || client.readyState !== WebSocket.OPEN)
@@ -363,11 +383,11 @@ function pushMessage(added_message,is_pre) {
   }
   if(!added_message.length)
     return;
-  var compressed = {
+  let compressed = {
     none:added_message,
     lz:LZString.compressToUTF16(added_message)
   };
-  var sent_to = 0;
+  let sent_to = 0;
   if(ws_server) {
     ws_server.clients.forEach(function each(client) {
       if (client == ws_server || client.readyState !== WebSocket.OPEN)
@@ -390,11 +410,27 @@ function pushMessage(added_message,is_pre) {
   }
 }
 
+// Promisified lockFile.
+function lock() {
+  return new Promise(function(resolve,reject) {
+    lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
+      if(err) {
+        // Don't drop out on error; we'll unlock the stale file later
+        console.error(err);
+      }
+      return resolve();
+    });
+  });
+}
+function unlock() {
+  lockFile.unlock(lock_file);
+}
+
 // Webserver functions
 function configureWebServer(app) {
   'use strict';
   if(!app)	app = express();
-  var limit_bytes = 1024*1024*1;	// 1 MB limit.
+  let limit_bytes = 1024*1024*1;	// 1 MB limit.
   if(ServerConfig.isLocal())
     app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
   if(typeof compression != 'undefined') {
@@ -409,7 +445,7 @@ function configureWebServer(app) {
 
   // Helper function for caching, and set ETag
   function expressCacheOptions(cache_time_ms) {
-    var headers = {
+    let headers = {
       'Cache-Control': 'max-age='+(cache_time_ms/1000)+', immutable',
       'Expires':new Date(Date.now()+cache_time_ms).toUTCString()
     }
@@ -442,6 +478,9 @@ function configureWebServer(app) {
   app.use('/favicon.ico',function(req,res,next) {return res.redirect(301,'/images/favicon.ico');});
   app.get('/loaderio-41ff037f96c3dfe9e3c8a7d4634b6239',function(req,res) {
     res.send('loaderio-41ff037f96c3dfe9e3c8a7d4634b6239');
+  });
+  app.post('/message',function() {
+    
   });
   app.post('/whisper',addWhisper);
   app.post(['/trader_quotes'],addTraderQuotes);
@@ -480,11 +519,11 @@ async function getBackup(req,res) {
     }
   },10000);
 }
-function addTraderQuotes(req,res) {
+async function addTraderQuotes(req,res) {
   res.end();
   if(!isValidTradeSource(req)) 
     return console.error("/add called from "+getIP(req)+" - naughty!");
-  var json = false;
+  let json = false;
   try {
     if(req.body.json)
       json = JSON.parse(req.body.json);
@@ -495,91 +534,80 @@ function addTraderQuotes(req,res) {
     return;
   }
   console.log("/trader_quotes:",json);
-  lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
-    if(err) console.error(err);
-    console.log("Trader quotes added");
-    // Don't drop out on error; we'll unlock the stale file later
-    KamadanTrade.addTraderPrices(json).then(function(updated_trader_prices) {
-      if(!updated_trader_prices)
-        return;
-      console.log("Trader prices updated");
-      pushPrices(updated_trader_prices,true);
-      pushPrices(updated_trader_prices,false);
-      KamadanTrade.getTraderPrices().then(function(prices) {
-        global.config.current_trade_prices = prices;
-      });
-    }).catch(function(e) {
-      console.error(e);
-    }).finally(function() {
-      lockFile.unlock(lock_file);
-    });
-  });
+  await lock();
+  try {
+    let updated_trader_prices = await KamadanTrade.addTraderPrices(json);
+    if(!updated_trader_prices)
+      return;
+    console.log("Trader prices updated");
+    pushPrices(updated_trader_prices,true);
+    pushPrices(updated_trader_prices,false);
+    global.config.current_trade_prices = await KamadanTrade.getTraderPrices();
+  } catch(e) {
+    console.error(e);
+  }
+  await unlock();
 }
-function addMessage(req, res, channel) {
+async function addMessage(req, res, channel) {
   res.end();
   if(!isValidTradeSource(req)) 
     return console.error("/add called from "+getIP(req)+" - naughty!");
-  var timestamp = Date.now();
-  var is_pre = isPreSearing(req);
-  var Trader = is_pre ? AscalonTrade : KamadanTrade;
-  lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
-    if(err) console.error(err);
-    // Don't drop out on error; we'll unlock the stale file later
-    Trader.addMessage(req,timestamp,channel).then(function(added_message) {
-      if(!added_message) {
-        console.log("No added message?");
-        return; // Error adding message
-      }
-      try {
-        pushMessage(added_message,is_pre);
-        Trader.cached_message_log = JSON.stringify(Trader.live_message_log);
-      } catch(e) {
-        console.error(e);
-      }
-    }).catch(function(e) {
-      console.error(e);
-    }).finally(function() {
-      lockFile.unlock(lock_file);
-    });
-  });
+  let timestamp = Date.now();
+  let is_pre = isPreSearing(req);
+  let Trader = is_pre ? AscalonTrade : KamadanTrade;
+  
+  await lock();
+  try {
+    let added_message = await Trader.addMessage(req,timestamp,channel);
+    if(added_message) {
+      pushMessage(added_message,is_pre);
+      Trader.cached_message_log = JSON.stringify(Trader.live_message_log);
+    } else {
+      console.log("No added message?");
+    }
+  } catch(e) {
+    console.error(e);
+  }
+  unlock();
 }
-function addWhisper(req,res) {
+async function addWhisper(req,res) {
   res.end();
   if(!isValidTradeSource(req)) 
     return console.error("/whisper called from "+getIP(req)+" - naughty!");
-  var timestamp = Date.now();
-  var is_pre = isPreSearing(req);
-  var Trader = is_pre ? AscalonTrade : KamadanTrade;
-  lockFile.lock(lock_file, {retries: 20, retryWait: 100}, (err) => {
-    if(err) console.error(err);
-    Trader.addWhisper(req,timestamp).then(function(message) {
-      if(message)
-        pushMessage(message,is_pre);
-    }).catch(function(e) {
-      console.error(e);
-    }).finally(function() {
-      lockFile.unlock(lock_file);
-    });
-  });
-}
-function getSearchJSON(req,res) {
-  var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
-  Trader.search(req.params.term,req.params.from,req.params.to).then(function(rows) {
-    res.json(rows);
-  }).catch(function(e) {
+  let timestamp = Date.now();
+  let is_pre = isPreSearing(req);
+  let Trader = is_pre ? AscalonTrade : KamadanTrade;
+  await lock();
+    try {
+    let added_message = Trader.addWhisper(req,timestamp);
+    if(added_message) {
+      pushMessage(added_message,is_pre);
+    }
+  } catch(e) {
     console.error(e);
-    res.json([]);
-  });
+  }
+  unlock();
 }
-function getSearchUserJSON(req,res) {
+async function getSearchJSON(req,res) {
+  let Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+  let rows = [];
+  try {
+     rows = await Trader.search(req.params.term,req.params.from,req.params.to);
+  } catch(e) {
+    console.error(e);
+  }
+  res.json(rows);
+}
+async function getSearchUserJSON(req,res) {
   var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
   var user = ((req.params.term || req.query.term)+'').replace(/^user:/,'');
-  Trader.search('user:'+user,req.params.from,req.params.to).then(function(rows) {
+  try {
+    let rows = await Trader.search('user:'+user,req.params.from,req.params.to);
     res.json(rows);
-  }).catch(function(e) {
+  } catch(e) {
     console.error(e);
     res.json([]);
-  });
+  }
 }
 function getMessagesJSON(req,res) {
   var etag = req.header('if-none-match') || 'none';
@@ -600,8 +628,9 @@ function getMessagesJSON(req,res) {
   res.setHeader('content-type', 'application/json; charset=utf-8');
   return res.send(Trader.cached_message_log);
 }
-function getStatsJSON(req,res) {
-  updateStats().then(function(stats) {
+async function getStatsJSON(req,res) {
+  try {
+    let stats = updateStats();
     if(isWhitelisted(req)) {
       stats.extended = {};
       var extended = extendedStats();
@@ -610,9 +639,9 @@ function getStatsJSON(req,res) {
       }
     }
     res.json(stats);
-  }).catch(function(e) {
-    res.json({"status":"error"});
-  });
+  } catch(e) {
+     res.json({"status":"error"});
+  }
 }
 function getSitemap(req,res) {
   var sitemap = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';

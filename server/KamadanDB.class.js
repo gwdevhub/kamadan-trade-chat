@@ -4,7 +4,7 @@ const { exec,spawn } = require("child_process");
 const fs = require("fs"); // Or `import fs from "fs";` with ESM 
 // Promosified shell command
 async function cmd(cmd, log_output = true, throw_on_fail = true) {
-  return new Promise((resolve, reject) => {    
+  return new Promise((resolve, reject) => {
     let stdout_buf = '', stderr_buf='', options = {};
     let first_arg = cmd;
     if(typeof cmd == 'string') {
@@ -43,45 +43,43 @@ function sleep(ms) {
   });
 } 
 
-var KamadanDB = {
-  query:function(query,args) {
-    var self = this;
-    //console.log("KamadanDB QUERY: "+query);
-    return this.init().then(function() {
-      return self.pool.getConnection().then(function(conn) {
-        var start = Date.now();
-        return conn.query(query, args || []).then(function(results) {
-          var duration = (Date.now() - start);
-          if(duration > 30) {
-            console.log("SLOW QUERY: "+query+"\nDuration: "+duration+"ms");
-          }
-          delete results['meta'];
-          return Promise.resolve(results);
-        }).finally(function() {
-          conn.end(function(err) {
-            if(err) conn.destroy();
-          });
-        });
-      });
-    });
+let KamadanDB = {
+  query:async function(query,args) {
+    await this.init();
+    let conn = null;
+    let results = [];
+    try {
+      conn = await this.pool.getConnection();
+      let start = Date.now();
+      results = await conn.query(query, args || []);
+      let duration = (Date.now() - start);
+      if(duration > 30) {
+        console.log("SLOW QUERY: "+query+"\nDuration: "+duration+"ms");
+      }
+      delete results['meta'];
+    } catch(e) {
+      console.error(e);
+    }
+    if(conn) {
+      conn.end().finally(conn.destroy());
+    }
+    return results;
   },
-  batch:function(query,args) {
-    var self = this;
-    
-    return this.init().then(function() {
-      //console.log("KamadanDB BATCH: "+query);
-      return self.pool.getConnection().then(function(conn) {
-        return conn.batch(query, args || []).then(function(results) {
-          //console.log(results);
-          delete results['meta'];
-          return Promise.resolve(results);
-        }).finally(function() {
-          conn.end(function(err) {
-            if(err) conn.destroy();
-          });
-        });
-      });
-    });
+  batch:async function(query,args) {
+    await this.init();
+    let conn = null;
+    let results = [];
+    try {
+      conn = await this.pool.getConnection();
+      results = await conn.batch(query, args || []);
+      delete results['meta'];
+    } catch(e) {
+      console.error(e);
+    }
+    if(conn) {
+      conn.end().finally(conn.destroy());
+    }
+    return results;
   },
   dump:async function(schema_regex) {
     // @Cleanup: escape regex?
@@ -90,9 +88,10 @@ var KamadanDB = {
     let now = new Date();
     let tmp_sql_folder = '/tmp/'+now.getUTCFullYear()+'-'+now.getUTCMonth()+'-'+now.getUTCDate()+'_'+schema_regex+'_'+Date.now();
     let gzipped_mysql_file = tmp_sql_folder+'.tar.gz';
-    await cmd('mkdir '+tmp_sql_folder,false,false);
-    files_to_clean[tmp_sql_folder] = 1;
+
     try {
+      await cmd('mkdir '+tmp_sql_folder,false);
+      files_to_clean[tmp_sql_folder] = 1;
       let credentials = '--host='+this.host+' --user='+this.user+' --password="'+this.password+'"';
       // 1 sql file per schema
       for(let i=0;i<schemas.length;schemas++ ) {
@@ -118,8 +117,8 @@ var KamadanDB = {
       await cmd('tar -zcvf '+gzipped_mysql_file+' '+tmp_sql_folder);
       if(!fs.existsSync(gzipped_mysql_file))
         throw "Failed to create gzip file @ "+gzipped_mysql_file;
-      var stats = fs.statSync(gzipped_mysql_file)
-      var fileSizeInBytes = stats["size"]
+      let stats = fs.statSync(gzipped_mysql_file)
+      let fileSizeInBytes = stats["size"]
       if(fileSizeInBytes < 5000)
         throw "Failed to create gzip file @ "+gzipped_mysql_file;
       delete files_to_clean[gzipped_mysql_file]; // dont want to delete this one.
@@ -134,16 +133,14 @@ var KamadanDB = {
       return false;
     return gzipped_mysql_file;
   },
-  seed:function() {
-    var self=this;
-    return Promise.resolve();
+  seed:async function() {
+    return;
   },
-  init:function() {
-    var self = this;
+  init:async function() {
     if(this.initted)
-      return Promise.resolve();
+      return;
     if(this.initting)
-      return sleep(500).then(function() { return self.init(); });
+      return (await sleep(500)), await this.init();
     this.initting = true;
     console.log("Initialising KamadanDB");
     this.user = ServerConfig.get('db_user');
@@ -157,13 +154,10 @@ var KamadanDB = {
       password: this.password,
       connectionLimit: 10
     });
-    var self = this;
-    self.initted = true;
-    return self.seed().finally(function() {
-      self.initting = false;
-      self.initted = true;
-      console.log("KamadanDB initialised");
-    });
+    await this.seed();
+    this.initting = false;
+    this.initted = true;
+    console.log("KamadanDB initialised");
   }
 };
 if(module && module.exports)
