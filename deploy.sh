@@ -117,4 +117,5 @@ printf "${RED}*** ${PROJECT_CONTAINER}: Restarting server.js (forever stopall &&
 sudo forever stop ${PROJECT_CODE_FOLDER}/server/server.js; 
 sudo touch /tmp/forever.log; 
 sudo chmod 777 /tmp/forever.log;
+sudo pkill -f kamadan-trade-client;
 sudo forever start -a -l /tmp/forever.log -s -c "node --expose-gc" ${PROJECT_CODE_FOLDER}/server/server.js
