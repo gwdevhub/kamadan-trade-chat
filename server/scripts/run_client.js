@@ -23,7 +23,7 @@ if(kamadan_gw_login && kamadan_gw_login.email && kamadan_gw_login.email.trim().l
 } else {
   console.error("Failed to get gw_kamadan_login from config");
 }
-var ascalon_gw_login = false;//ServerConfig.get('gw_ascalon_login');
+var ascalon_gw_login = ServerConfig.get('gw_ascalon_login');
 if(ascalon_gw_login && ascalon_gw_login.email && ascalon_gw_login.email.trim().length) {
   exec('ps -elf | grep "[-]email \"'+ascalon_gw_login.email+'\""',function(a,stdout,c) {
     if(stdout.indexOf('-email') != -1)
