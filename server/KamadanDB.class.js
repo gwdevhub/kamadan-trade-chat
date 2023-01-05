@@ -44,19 +44,21 @@ function sleep(ms) {
 } 
 
 let KamadanDB = {
-  query:async function(query,args) {
+  queryMultiple:async function(queries) {
     await this.init();
     let conn = null;
     let results = [];
     try {
       conn = await this.pool.getConnection();
-      let start = Date.now();
-      results = await conn.query(query, args || []);
-      let duration = (Date.now() - start);
-      if(duration > 30) {
-        console.log("SLOW QUERY: "+query+"\nDuration: "+duration+"ms");
+      for(let i=0;i<queries.length;i++) {
+        let start = Date.now();
+        results = await conn.query(queries[i][0], queries[i][1] || []);
+        let duration = (Date.now() - start);
+        if(duration > 30) {
+          console.log("SLOW QUERY: "+queries[i][0]+"\nDuration: "+duration+"ms");
+        }
+        delete results['meta'];
       }
-      delete results['meta'];
     } catch(e) {
       console.error(e);
     }
@@ -64,6 +66,9 @@ let KamadanDB = {
       conn.end().finally(conn.destroy());
     }
     return results;
+  },
+  query:async function(query,args) {
+    return this.queryMultiple([[query,args || []]]);
   },
   batch:async function(query,args) {
     await this.init();

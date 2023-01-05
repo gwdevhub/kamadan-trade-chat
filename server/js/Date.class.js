@@ -33,6 +33,9 @@ Date.prototype.pad = function(str) {
 		return str;
 	return '0'+i;
 }
+Date.prototype.isoDate = function() {
+	return this.format('Y-m-d');
+}
 Date.prototype.format = function(str) {
 	if((typeof str !== 'string') || !str.trim().length)
 		str = 'YYYY-MM-dd HH:mm:ss';

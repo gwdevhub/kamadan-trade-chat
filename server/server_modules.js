@@ -35,6 +35,27 @@ if(!global.server_modules_included) {
   global.Channel_Advisory                = 13;
   global.Channel_Whisper                 = 14;
 
+  global.MessageType_Chat_Alliance = 0;
+  global.MessageType_Chat_Allies = 1;
+  global.MessageType_Chat_GWCA1 = 2;
+  global.MessageType_Chat_All = 3;
+  global.MessageType_Chat_GWCA2 = 4;
+  global.MessageType_Chat_Moderator = 5;
+  global.MessageType_Chat_Emote = 6;
+  global.MessageType_Chat_Warning = 7;
+  global.MessageType_Chat_GWCA3 = 8;
+  global.MessageType_Chat_Guild = 9;
+  global.MessageType_Chat_Global = 10;
+  global.MessageType_Chat_Group = 11;
+  global.MessageType_Chat_Trade = 12;
+  global.MessageType_Chat_Advisory = 13;
+  global.MessageType_Chat_Whisper = 14;
+  global.MessageType_PartySearch_Hunting = 100;
+  global.MessageType_PartySearch_Mission = 101;
+  global.MessageType_PartySearch_Quest = 102;
+  global.MessageType_PartySearch_Trade = 103;
+  global.MessageType_PartySearch_Guild = 104;
+
 
   global.serverScripts = {};
 
@@ -123,7 +144,7 @@ if(!global.server_modules_included) {
       console.error("repeat_every_day for "+script+" failed!");
       console.error(e);
     }).finally(function() {
-      console.log("repeat_script for "+script+" finished, reqeueing...");
+      //console.log("repeat_script for "+script+" finished, reqeueing...");
       setTimeout(function() { repeat_script(script,interval) },interval);
     });
   }

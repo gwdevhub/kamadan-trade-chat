@@ -222,11 +222,8 @@ KamadanTrade.prototype.init = function() {
 }
 KamadanTrade.prototype.quarantineCheck = function(message) {
   // True on match
-  //var msg_norm_auto = message.m.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-  var msg_norm_manual = message.m.removeDiacritics().removePunctuation().removeSpaces();
+  let msg_norm_manual = message.m.removeDiacritics().removePunctuation().removeUnderscores().removeSpaces();
   for(var i in this.quarantine_regexes) {
-    //if(this.quarantine_regexes[i].test(msg_norm_auto))
-    //  return true;
     if(this.quarantine_regexes[i].test(msg_norm_manual))
       return true;
   }
@@ -381,26 +378,88 @@ KamadanTrade.prototype.addWhisper = async function(req,timestamp) {
     return {r:r};
   }
 }
+KamadanTrade.prototype.quarantineMessage = async function(message) {
+  //console.log("Message hit quarantine");
+  //console.log(message.m);
+  let table = this.table_prefix+'quarantine';
+  await this.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]);
+  return message;
+}
+KamadanTrade.prototype.getQuarantine = async function(from,to) {
+  let queries = [
+      ["SET sql_mode=(SELECT REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY', ''));"],
+      ["SELECT FROM_UNIXTIME(t / 1000,\"%Y-%m-%d %h:%i:%s\") as timestamp_utc, s as player_name,\n" +
+      "      m as trade_message FROM (SELECT *\n" +
+      "      FROM kamadan_quarantine\n" +
+      "  WHERE t > "+from+"\n" +
+      "  AND t < "+to+") Z\n" +
+      "  GROUP BY player_name\n" +
+      "  ORDER BY timestamp_utc DESC;"]
+  ];
+  let res = await this.db.queryMultiple(queries);
+  return res;
+}
 KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
   let message = this.parseMessageFromRequest(req,timestamp);
   if(message instanceof Error)
     throw message;
   //console.log("Trade message received OK");
   let quarantined = this.quarantineCheck(message);
-  let table = this.table_prefix+(new Date()).getUTCFullYear();
+
   if(quarantined) {
-    console.log("Message hit quarantine: "+message.m);
-    table = this.table_prefix+'quarantine';
-  }
-  // Local messages are checked for quarantine, then discarded.
-  if(!quarantined && channel != Channel_Trade) {
-    console.log("Non-trade message received:"+message.m);
+    await this.quarantineMessage(message);
     return false;
   }
-  
+  let table = this.table_prefix+(new Date()).getUTCFullYear();
+  switch(channel) {
+    case MessageType_Chat_Trade:
+    case MessageType_PartySearch_Trade:
+      break;
+    default:
+      console.log("Non-trade chat message received");
+      return false;
+  }
+
+  await this.init();
+
+  let existing_message_id = false;
+  if(channel === MessageType_PartySearch_Trade) {
+    //console.log("Checking to see if we've received a chat version of this message");
+    // Check to see if we've received a party search advert from this user less than 2 seconds ago with the same message.
+    let res = await this.db.query("SELECT m,t FROM "+table+" WHERE s = ? AND m <> ? AND t > ? ORDER BY t DESC LIMIT 5",
+        [message.s,message.m,message.m,message.t - 2000]);
+    if(res.length) {
+      for(let i=0;i<res.length;i++) {
+        if(res[i].m.length > message.m.length && res[i].m.indexOf(message.m) === 0) {
+          console.log("Found existing chat version of this message, no need to write to database.")
+          return false; // no need to write
+        }
+      }
+      //console.log(" !!!!! Match found!");
+    } else {
+      //console.log("No match found");
+    }
+  }
+  if(channel === MessageType_Chat_Trade && message.m.length > 31) {
+    //console.log("Checking to see if we've received a party search version of this message");
+    //console.log(message.m);
+    // Check to see if we've received a party search advert from this user less than 2 seconds ago with the same message.
+    let trade_search_message = message.m.substring(0,31);
+    let res = await this.db.query("SELECT m,t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",
+        [message.s,trade_search_message,message.t - 2000]);
+    if(res.length) {
+      existing_message_id = res[0].t;
+      console.log("Found party search version of this message; replace found message with this one.")
+      //console.log(" !!!!! Match found!");
+    } else {
+      //console.log("No match found");
+    }
+  }
   // Avoid spam by the same user (or multiple trade message sources!)
   let last_user_msg = this.last_message_by_user[message.s];
-  if(last_user_msg && last_user_msg.m.removePunctuation() == message.m.removePunctuation()) {
+  let last_user_message_body = last_user_msg ? last_user_msg.m.removePunctuation() : '';
+  let message_less_punctuation = message.m.removePunctuation();
+  if(last_user_message_body && last_user_message_body == message_less_punctuation) {
     if(Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
       console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"ms diff");
       return false;
@@ -408,12 +467,20 @@ KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
     // Avoid spammers adding random chars to their trade message by consolidating it.
     message.m = last_user_msg.m;
   }
-  await this.init();
-  let res = await this.db.query("SELECT t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",[message.s,message.m,message.t - (864e5 * 14)]);
-  if(res.length) {
-    message.r = res[0].t;
-    await this.db.query("UPDATE "+table+" SET t = ? WHERE t = ?",[message.t,res[0].t]);
+  if(!existing_message_id) {
+    // Look for the same message from this user in the last 14 days...
+    let res = await this.db.query("SELECT t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",[message.s,message.m,message.t - (864e5 * 14)]);
+    if(res.length) {
+      existing_message_id = res[0].t;
+    }
+  }
+  if(existing_message_id) {
+    // ...if found, just update the timestamp of the found message to be new again
+    // message.r = "Replace with this message id"
+    message.r = existing_message_id;
+    await this.db.query("UPDATE "+table+" SET t = ?, m = ? WHERE t = ?",[message.t,message.m,existing_message_id]);
   } else {
+    // ...if not found, insert this message as a new trade message!
     await this.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]);
   }
   this.last_message_by_user[message.s] = message;

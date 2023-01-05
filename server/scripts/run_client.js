@@ -1,6 +1,6 @@
 if(typeof exec == 'undefined') {
   process.env.NODE_PATH = __dirname+'/../../node_modules';
-  console.log(__dirname+'/../../node_modules');
+  //console.log(__dirname+'/../../node_modules');
   require("module").Module._initPaths();
 }
 var exec = exec || require('child_process').exec;

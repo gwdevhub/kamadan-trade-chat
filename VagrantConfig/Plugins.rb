@@ -20,6 +20,7 @@ required_plugins = {
 	#'vagrant-google'=>false,
 	#'vagrant-linode'=>false
 	#'vagrant-azure'=>false
+	'vagrant-managed-servers'=>false
 }
 plugins_installed=0
 required_plugins.each do |plugin_name,plugin|

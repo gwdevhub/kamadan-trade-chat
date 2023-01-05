@@ -115,6 +115,9 @@ String.prototype.contains =  String.prototype.includes;
 String.prototype.removeSpaces = function() {
 	return this.replace(/[\s]/g,'');
 }
+String.prototype.removeUnderscores = function() {
+    return this.replace(/[_]/g,'');
+}
 String.prototype.removePunctuation = function() {
 	return this.replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,.\/:;<=>\-?@\[\]^`{|}~]/g,'').replace(/\s+/g,' ');
 }

@@ -5,7 +5,7 @@ var fs = fs || require('fs');
 eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
 // Used for various SSL handling
-global.ssl_info = { 
+global.ssl_info = {
   enabled:false,
   ssl_domains: {},
   ssl_email: ServerConfig.get('ssl_email')
@@ -14,7 +14,7 @@ let ssl_domains = ServerConfig.get('ssl_domains') || [ServerConfig.get('ssl_doma
 for(let i in ssl_domains) {
   if(!ssl_domains[i]) continue;
   if(!global.ssl_info.ssl_email) {
-    console.error("No SSL email defined in server config (ssl_email).\nThis server won't be running in SSL."); 
+    console.error("No SSL email defined in server config (ssl_email).\nThis server won't be running in SSL.");
     break;
   }
   global.ssl_info.ssl_domains[ssl_domains[i]] = { enabled:false }
@@ -50,7 +50,7 @@ let blacklisted_ips = [
   //'162.158.*.*'
 ];
 let sockets_by_ip = {
-  
+
 }
 let lock_file = __dirname+'/add.lock';
 fs.unlink(lock_file,function(){});
@@ -79,7 +79,7 @@ let https_server;
 let ws_server;
 let wss_server;
 let last_search_by_ip = {
-  
+
 };
 
 global.stats = {
@@ -246,11 +246,11 @@ function configureWebsocketServer(server) {
   let websrvr = new WebSocketServer({
     server: server
   });
-  
+
   function heartbeat() {
     this.isAlive = true;
   }
-  
+
   websrvr.on('connection', function(ws, request) {
     ws.is_presearing = isPreSearing(request);
     ws.compression='none';
@@ -341,7 +341,7 @@ function pushPrices(prices,is_pre) {
   try {
     prices = JSON.stringify(prices);
   } catch(e) {
-    prices = ''; 
+    prices = '';
   }
   if(!prices.length)
     return;
@@ -379,7 +379,7 @@ function pushMessage(added_message,is_pre) {
   try {
     added_message = JSON.stringify(added_message);
   } catch(e) {
-    added_message = ''; 
+    added_message = '';
   }
   if(!added_message.length)
     return;
@@ -431,11 +431,11 @@ function configureWebServer(app) {
   'use strict';
   if(!app)	app = express();
   let limit_bytes = 1024*1024*1;	// 1 MB limit.
-  if(ServerConfig.isLocal())
-    app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
+  //if(ServerConfig.isLocal())
+ //   app.use(morgan('dev'));			// Logging of HTTP requests to the console when they happen
   if(typeof compression != 'undefined') {
     app.use(compression({ filter: shouldCompress }))
-    
+
   }
   app.use(compression())
   app.get(redirectSSL);
@@ -458,7 +458,7 @@ function configureWebServer(app) {
   }
   app.set('etag', 'strong');
   app.set('x-powered-by', false);
-  app.use(function (req, res, next) {  
+  app.use(function (req, res, next) {
     res.removeHeader("date");
     res.set('X-Clacks-Overhead',"GNU Terry Pratchett"); // For Terry <3
     next();
@@ -479,8 +479,42 @@ function configureWebServer(app) {
   app.get('/loaderio-41ff037f96c3dfe9e3c8a7d4634b6239',function(req,res) {
     res.send('loaderio-41ff037f96c3dfe9e3c8a7d4634b6239');
   });
-  app.post('/message',function() {
-    
+  app.get('/quarantine',async function(req,res) {
+      let from = (new Date()).toStartOfMonth();
+      let end = (new Date()).toEndOfDay();
+      let results = await KamadanTrade.getQuarantine(from.getTime(),end.getTime());
+      let headers = Object.keys(results[0]);
+      let csv = [];
+      let line = [];
+      csv.push(headers);
+      for(let i in results) {
+        line = [];
+        for(let j in headers) {
+          line.push(results[i][headers[j]]);
+        }
+        csv.push(line.toString());
+      }
+      res.attachment('quarantine_'+from.isoDate()+'_to_'+end.isoDate()+'.csv').send(csv.join("\n"));
+  })
+  app.post('/message',function(req,res) {
+    res.end();
+    let body = req.body || '';
+    if(typeof body == 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch(e) {}
+    }
+    let type = parseInt(body.t || '99999');
+    console.log("Message type "+type+": '"+(body.s || '')+"' '"+(body.m || '')+"'");
+    switch(type) {
+      case MessageType_Chat_Trade:
+      case MessageType_PartySearch_Trade: // TODO: SPLIT THIS.
+        return addMessage(req,res,type);
+      case MessageType_Chat_All:
+        return addMessage(req,res,Channel_All);
+      case MessageType_Chat_Whisper:
+        return addWhisper(req,res);
+    }
   });
   app.post('/whisper',addWhisper);
   app.post(['/trader_quotes'],addTraderQuotes);
@@ -521,14 +555,14 @@ async function getBackup(req,res) {
 }
 async function addTraderQuotes(req,res) {
   res.end();
-  if(!isValidTradeSource(req)) 
+  if(!isValidTradeSource(req))
     return console.error("/add called from "+getIP(req)+" - naughty!");
   let json = false;
   try {
     if(req.body.json)
       json = JSON.parse(req.body.json);
     if(!json)
-      json = JSON.parse(req.body);          
+      json = JSON.parse(req.body);
   } catch(e) {
     console.error("Invalid or malformed json in /trader_quotes");
     return;
@@ -550,12 +584,12 @@ async function addTraderQuotes(req,res) {
 }
 async function addMessage(req, res, channel) {
   res.end();
-  if(!isValidTradeSource(req)) 
+  if(!isValidTradeSource(req))
     return console.error("/add called from "+getIP(req)+" - naughty!");
   let timestamp = Date.now();
   let is_pre = isPreSearing(req);
   let Trader = is_pre ? AscalonTrade : KamadanTrade;
-  
+
   await lock();
   try {
     let added_message = await Trader.addMessage(req,timestamp,channel);
@@ -563,7 +597,8 @@ async function addMessage(req, res, channel) {
       pushMessage(added_message,is_pre);
       Trader.cached_message_log = JSON.stringify(Trader.live_message_log);
     } else {
-      console.log("No added message?");
+      // Message blocked due to spam/gold seller
+      //console.log("No added message?");
     }
   } catch(e) {
     console.error(e);
@@ -572,7 +607,7 @@ async function addMessage(req, res, channel) {
 }
 async function addWhisper(req,res) {
   res.end();
-  if(!isValidTradeSource(req)) 
+  if(!isValidTradeSource(req))
     return console.error("/whisper called from "+getIP(req)+" - naughty!");
   let timestamp = Date.now();
   let is_pre = isPreSearing(req);
@@ -619,7 +654,7 @@ function getMessagesJSON(req,res) {
     return res.status(304).end();
   //console.log(KamadanTrade.last_message);
   res.setHeader('ETag', Trader.last_message.t);
-  
+
   // Return messages since last hash
   if(etag != 'none') {
     return res.json(Trader.getMessagesSince(etag));
@@ -630,7 +665,7 @@ function getMessagesJSON(req,res) {
 }
 async function getStatsJSON(req,res) {
   try {
-    let stats = updateStats();
+    let stats = await updateStats();
     if(isWhitelisted(req)) {
       stats.extended = {};
       var extended = extendedStats();
@@ -699,13 +734,13 @@ function getPricingHistoryJSON(req,res) {
   // Check/renew SSL certificates daily.
   //repeat_script('renew_ssl_certificates.js',864e5);
   repeat_script('run_client.js',10000);
-  
+
   await KamadanTrade.init();
   KamadanTrade.cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
   global.config.current_trade_prices = await KamadanTrade.getTraderPrices();
   await AscalonTrade.init();
   AscalonTrade.cached_message_log = JSON.stringify(AscalonTrade.live_message_log);
-  
+
   console.log("\n---------- Starting Web Server ----------\n");
   var app = configureWebServer();
   if(global.ssl_info.enabled) {

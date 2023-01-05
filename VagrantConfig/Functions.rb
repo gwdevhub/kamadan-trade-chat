@@ -22,7 +22,9 @@ def plugin_version(name)
 end
 def plugin_dir(name)
 	@vagrant_home ||= ENV['VAGRANT_HOME'] || File.join(ENV['USERPROFILE'] || ENV['HOME'],".vagrant.d")
-	plugins = JSON.parse(File.read(File.join(@vagrant_home,"plugins.json")))
+	plugin_file = File.join(@vagrant_home,"plugins.json")
+	return '' if !File.file?(plugin_file)
+	plugins = JSON.parse(File.read(plugin_file))
 	return '' if !plugins['installed']
 	return '' if !plugins['installed'][name]
 	# C:\Users\jon\.vagrant.d\gems\2.2.5\gems\vagrant-linode-0.2.8
