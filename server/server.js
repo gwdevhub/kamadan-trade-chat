@@ -43,8 +43,7 @@ let whitelisted_sources = [
     '1',
 '127.0.0.1',
 '10.10.10.1',
-'142.44.211.74', // Greg
-'81.101.64.164'// Me
+'81.103.52.7'
 ];
 let blacklisted_ips = [
   //'162.158.*.*'
@@ -532,7 +531,10 @@ function configureWebServer(app) {
   app.get(['/','/:trader_item'], getIndexHTML);
   return app;
 }
-async function getBackup(req,res) {
+let backing_up = false;
+let backup_file = null;
+
+async function awaitBackup(req,res) {
   if(!isWhitelisted(req))
     return res.send('nope');
   console.log(KamadanTrade.db);
@@ -552,6 +554,40 @@ async function getBackup(req,res) {
       }
     }
   },10000);
+}
+async function getBackup(req,res) {
+  if(!isWhitelisted(req))
+    return res.send('nope');
+  console.log(KamadanTrade.db);
+  if(backup_file) {
+    res.download(backup_file);
+    setTimeout(function() {
+      if(fs.existsSync(backup_file)) {
+        console.log("Deleting "+backup_file);
+        try {
+          fs.unlinkSync(backup_file);
+          console.log("Deleted");
+        } catch(e) {
+          console.error(e);
+          // silent
+        }
+      }
+    },10000);
+    return;
+  }
+
+  if(!backing_up) {
+    backing_up = true;
+    KamadanTrade.db.dump('kamadan').then(function(file) {
+      backup_file = file;
+      backing_up = false;
+    }).catch(function(e) {
+      backup_file = null;
+      backing_up = false;
+    });
+  }
+  res.send("<!DOCTYPE html><html><body>Waiting for backup, please wait.<script>setTimeout(function() { window.location.reload();},5000);</script></body></html>");
+  return;
 }
 async function addTraderQuotes(req,res) {
   res.end();

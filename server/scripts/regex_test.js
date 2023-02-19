@@ -21,6 +21,11 @@ let message = process.argv[2];
 //var msg_norm_auto = message.m.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 let msg_norm_manual = message.removeDiacritics().removePunctuation().removeUnderscores().removeSpaces();
 console.log("message normalised:\n"+msg_norm_manual+"\n");
+
+let arr = msg_norm_manual.split('').map(function(el) {
+    return el.charCodeAt(0);
+})
+console.log(arr);
 for(var i in quarantine_regexes) {
     //if(this.quarantine_regexes[i].test(msg_norm_auto))
     //  return true;
