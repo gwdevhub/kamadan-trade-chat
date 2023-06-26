@@ -4,6 +4,16 @@ require("module").Module._initPaths();
 var fs = fs || require('fs');
 eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
+BigInt.prototype.toJSON = function() { return this.toString() }
+
+function stringify(obj) {
+  return JSON.stringify(obj, (key, value) =>
+      typeof value === 'bigint'
+          ? value.toString()
+          : value // return everything else unchanged
+  );
+}
+
 // Used for various SSL handling
 global.ssl_info = {
   enabled:false,
@@ -61,7 +71,7 @@ Handlebars.registerHelper("relativeTime", function(t) {
   return (new Date(t)).relativeTime();
 });
 Handlebars.registerHelper("toJson", function(t) {
-  return JSON.stringify(t);
+  return stringify(t);
 });
 function renderFile(file,args) {
   compile_cache[file] = compile_cache[file] || Handlebars.compile(fs.readFileSync(file)+'');
@@ -257,6 +267,7 @@ function configureWebsocketServer(server) {
     ws.ip = getIP(request);
     ws.ua = getUserAgent(request);
     ws.recv = 0;
+    console.log("Websocket connection from "+ws.ip+" ("+ws.ua+")");
     if(isBlacklisted(request)) {
       console.log("Rejecting blacklisted websocket "+getIP(request));
       dropSocket(ws);
@@ -265,14 +276,17 @@ function configureWebsocketServer(server) {
     sockets_by_ip[ws.ip] = sockets_by_ip[ws.ip] || [];
     while(sockets_by_ip[ws.ip].length > 3) {
       // 3 socket per ip.
+      console.log("Max websockets reached for ip "+ws.ip+", dropping connection for last used socket");
       dropSocket(sockets_by_ip[ws.ip].shift());
     }
     sockets_by_ip[ws.ip].push(ws);
     ws.on('pong', heartbeat);
     updateStats();
     ws.on('message', function(message) {
+      console.log("Websocket message from "+ws.ip);
       return onWebsocketMessage(message,ws);
     });
+    ws.ping();
   });
   const interval = setInterval(function ping() {
     websrvr.clients.forEach(function each(ws) {
@@ -317,7 +331,7 @@ async function onWebsocketMessage(message,ws) {
   let Trader = isPreSearing(ws) ? AscalonTrade : KamadanTrade;
   if(typeof message.since != 'undefined') {
     let rows = Trader.getMessagesSince(message.since || 'none');
-    return ws.send(JSON.stringify({since:message.since, num_results:rows.length,results:rows}));
+    return ws.send(stringify({since:message.since, num_results:rows.length,results:rows}));
   }
   if(typeof message.query != 'undefined') {
     let rows = [];
@@ -333,12 +347,12 @@ async function onWebsocketMessage(message,ws) {
       }
       delete last_search_by_ip[ws.ip];
     }
-    return ws.send(JSON.stringify({query:message.query, num_results:rows.length,results:rows}));
+    return ws.send(stringify({query:message.query, num_results:rows.length,results:rows}));
   }
 }
 function pushPrices(prices,is_pre) {
   try {
-    prices = JSON.stringify(prices);
+    prices = stringify(prices);
   } catch(e) {
     prices = '';
   }
@@ -376,7 +390,7 @@ function pushPrices(prices,is_pre) {
 }
 function pushMessage(added_message,is_pre) {
   try {
-    added_message = JSON.stringify(added_message);
+    added_message = stringify(added_message);
   } catch(e) {
     added_message = '';
   }
@@ -631,7 +645,7 @@ async function addMessage(req, res, channel) {
     let added_message = await Trader.addMessage(req,timestamp,channel);
     if(added_message) {
       pushMessage(added_message,is_pre);
-      Trader.cached_message_log = JSON.stringify(Trader.live_message_log);
+      Trader.cached_message_log = stringify(Trader.live_message_log);
     } else {
       // Message blocked due to spam/gold seller
       //console.log("No added message?");
@@ -772,10 +786,10 @@ function getPricingHistoryJSON(req,res) {
   repeat_script('run_client.js',10000);
 
   await KamadanTrade.init();
-  KamadanTrade.cached_message_log = JSON.stringify(KamadanTrade.live_message_log);
+  KamadanTrade.cached_message_log = stringify(KamadanTrade.live_message_log);
   global.config.current_trade_prices = await KamadanTrade.getTraderPrices();
   await AscalonTrade.init();
-  AscalonTrade.cached_message_log = JSON.stringify(AscalonTrade.live_message_log);
+  AscalonTrade.cached_message_log = stringify(AscalonTrade.live_message_log);
 
   console.log("\n---------- Starting Web Server ----------\n");
   var app = configureWebServer();
