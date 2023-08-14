@@ -223,7 +223,7 @@ async function updateStats() {
   try {
     let res = await KamadanDB.query("SELECT max(t) t FROM kamadan_"+(new Date()).getUTCFullYear());
     if(res.length)
-       global.stats.last_trade_message = new Date(res[0].t);
+       global.stats.last_trade_message = new Date(Number(res[0].t));
   } catch(e) {
     console.error(e);
   }
@@ -518,7 +518,7 @@ function configureWebServer(app) {
       } catch(e) {}
     }
     let type = parseInt(body.t || '99999');
-    console.log("Message type "+type+": '"+(body.s || '')+"' '"+(body.m || '')+"'");
+    //console.log("Message type "+type+": '"+(body.s || '')+"' '"+(body.m || '')+"'");
     switch(type) {
       case MessageType_Chat_Trade:
       case MessageType_PartySearch_Trade: // TODO: SPLIT THIS.

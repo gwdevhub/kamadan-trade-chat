@@ -65,6 +65,10 @@ KamadanTrade.prototype.addTraderPrices = async function(json) {
   sql_args = [];
   sql_insert = [];
   for(let i in updated_prices) {
+    if(!item_id_by_modstruct[updated_prices[i].m]) {
+      console.log("Missing item_id matching mod struct",updated_prices[i].m);
+      continue;
+    }
     sql_args.push(item_id_by_modstruct[updated_prices[i].m]);
     sql_args.push(updated_prices[i].p);
     sql_args.push(updated_prices[i].t);
