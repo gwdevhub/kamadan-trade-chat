@@ -147,7 +147,7 @@ KamadanTrade.prototype.init = function() {
     return sleep(500).then(function() { return self.init(); });
   this.initting = true;
   console.log("Initialising KamadanTrade");
-  
+
   this.quarantine_regexes = [];
   try {
     var regex_strings = (fs.readFileSync(__dirname+'/chat_filter_regexes.txt')+'').split('\n');
@@ -158,7 +158,7 @@ KamadanTrade.prototype.init = function() {
       this.quarantine_regexes.push(new RegExp(regex_strings[i],'i'));
     }
     console.log("Chat filter regexes: ",this.quarantine_regexes);
-    
+
   } catch(e) {
     console.error("Failed to parse "+__dirname+'/chat_filter_regexes.txt');
     console.error(e);
@@ -343,7 +343,7 @@ KamadanTrade.prototype.parseMessageFromRequest = function(req,timestamp) {
   }
   if(!message.m || !message.s)
     return new Error("Missing sender/message when creating message");
-  
+
   // Parse message content
   message.m = message.m.replace(/\\(\\|\[|\])/g,'$1');
   // 2020-03-06: RMT adding garbage to the end of their message
@@ -428,25 +428,17 @@ KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
 
   let existing_message_id = false;
   if(channel === MessageType_PartySearch_Trade) {
-    //console.log("Checking to see if we've received a chat version of this message");
-    // Check to see if we've received a party search advert from this user less than 2 seconds ago with the same message.
+    // Check to see if we've received a chat version of this message from this user less than 2 seconds ago with the same message.
     let res = await this.db.query("SELECT m,t FROM "+table+" WHERE s = ? AND m <> ? AND t > ? ORDER BY t DESC LIMIT 5",
-        [message.s,message.m,message.m,message.t - 2000]);
-    if(res.length) {
-      for(let i=0;i<res.length;i++) {
-        if(res[i].m.length > message.m.length && res[i].m.indexOf(message.m) === 0) {
-          console.log("Found existing chat version of this message, no need to write to database.")
-          return false; // no need to write
-        }
+        [message.s,message.m,message.t - 2000]);
+    for(let i=0;i<res.length;i++) {
+      if(res[i].m.length > message.m.length && res[i].m.indexOf(message.m) === 0) {
+        console.log("Found existing chat version of this message, no need to write to database.")
+        return false; // no need to write
       }
-      //console.log(" !!!!! Match found!");
-    } else {
-      //console.log("No match found");
     }
   }
   if(channel === MessageType_Chat_Trade && message.m.length > 31) {
-    //console.log("Checking to see if we've received a party search version of this message");
-    //console.log(message.m);
     // Check to see if we've received a party search advert from this user less than 2 seconds ago with the same message.
     let trade_search_message = message.m.substring(0,31);
     let res = await this.db.query("SELECT m,t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",
@@ -454,16 +446,13 @@ KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
     if(res.length) {
       existing_message_id = res[0].t;
       console.log("Found party search version of this message; replace found message with this one.")
-      //console.log(" !!!!! Match found!");
-    } else {
-      //console.log("No match found");
     }
   }
   // Avoid spam by the same user (or multiple trade message sources!)
   let last_user_msg = this.last_message_by_user[message.s];
   let last_user_message_body = last_user_msg ? last_user_msg.m.removePunctuation() : '';
   let message_less_punctuation = message.m.removePunctuation();
-  if(last_user_message_body && last_user_message_body == message_less_punctuation) {
+  if(last_user_message_body && last_user_message_body === message_less_punctuation) {
     if(Math.abs(message.t - last_user_msg.t) < this.flood_timeout) {
       console.log("Flood filter hit for "+last_user_msg.s+", "+Math.abs(message.t - last_user_msg.t)+"ms diff");
       return false;
