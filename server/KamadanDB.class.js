@@ -1,47 +1,8 @@
 var mariadb = require('mariadb');
 var ServerConfig = require(__dirname+'/ServerConfig.class.js');
 const { exec,spawn } = require("child_process");
-const fs = require("fs"); // Or `import fs from "fs";` with ESM 
-// Promosified shell command
-async function cmd(cmd, log_output = true, throw_on_fail = true) {
-  return new Promise((resolve, reject) => {
-    let stdout_buf = '', stderr_buf='', options = {};
-    let first_arg = cmd;
-    if(typeof cmd == 'string') {
-      options.shell = true;
-      cmd = [];
-    } else {
-      first_arg = cmd.shift();
-    }
-    let spawn_args = [first_arg,cmd,options];
-    console.log(' >>> '+([first_arg].concat(cmd).join(' ')));
-    let proc    = spawn.apply(exec,spawn_args);
-    proc.stdout.on('data', function (data) {
-      if(log_output) console.log(' <<< ' +data.toString());
-      stdout_buf += data.toString();
-    });
+const fs = require("fs"); // Or `import fs from "fs";` with ESM
 
-    proc.stderr.on('data', function (data) {
-      if(log_output) console.log(' <<< '+data.toString());
-      stdout_buf += data.toString();
-    });
-    if(throw_on_fail)
-      proc.on('error', reject);
-    proc.on('exit', function (code) {
-      if(code != 0 && throw_on_fail) {
-      console.log(' <<< '+stdout_buf);
-      return reject(code);
-    }
-      return resolve(stdout_buf);
-    });
-  });
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-} 
 
 let KamadanDB = {
   queryMultiple:async function(queries) {
@@ -69,6 +30,11 @@ let KamadanDB = {
   },
   query:async function(query,args) {
     return this.queryMultiple([[query,args || []]]);
+  },
+  queryObjects:async function(query,args,className) {
+    return this.queryMultiple([[query,args || []]]).map((row) => {
+      return new className(row);
+    });
   },
   batch:async function(query,args) {
     await this.init();
@@ -108,7 +74,7 @@ let KamadanDB = {
         // NB: Create database statements later
         await cmd('mysqldump '+credentials+' --insert-ignore --no-create-db --skip-add-drop-table '+db_name+' > '+mysql_file, false);
         files_to_clean[mysql_file] = 1;
-        
+
         // Ensure "create table if not exists" and "use" statements
         let extra_lines = "CREATE DATABASE IF NOT EXISTS "+db_name+";\n USE "+db_name+";\n";
         let tmp_file = mysql_file+'.tmp';
@@ -118,7 +84,7 @@ let KamadanDB = {
         await cmd('mv '+tmp_file+' '+mysql_file);
       }
       // Gzip file.
-      
+
       await cmd('tar -zcvf '+gzipped_mysql_file+' '+tmp_sql_folder);
       if(!fs.existsSync(gzipped_mysql_file))
         throw "Failed to create gzip file @ "+gzipped_mysql_file;
@@ -153,9 +119,9 @@ let KamadanDB = {
     this.host = ServerConfig.get('db_host') || '127.0.0.1';
     this.database = ServerConfig.get('db_schema');
     this.pool = mariadb.createPool({
-      host: this.host, 
+      host: this.host,
       database:this.database,
-      user:this.user, 
+      user:this.user,
       password: this.password,
       connectionLimit: 10
     });

@@ -6,58 +6,7 @@ eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
 BigInt.prototype.toJSON = function() { return this.toString() }
 
-function stringify(obj) {
-  return JSON.stringify(obj, (key, value) =>
-      typeof value === 'bigint'
-          ? value.toString()
-          : value // return everything else unchanged
-  );
-}
 
-// Used for various SSL handling
-global.ssl_info = {
-  enabled:false,
-  ssl_domains: {},
-  ssl_email: ServerConfig.get('ssl_email')
-};
-let ssl_domains = ServerConfig.get('ssl_domains') || [ServerConfig.get('ssl_domain')];
-for(let i in ssl_domains) {
-  if(!ssl_domains[i]) continue;
-  if(!global.ssl_info.ssl_email) {
-    console.error("No SSL email defined in server config (ssl_email).\nThis server won't be running in SSL.");
-    break;
-  }
-  global.ssl_info.ssl_domains[ssl_domains[i]] = { enabled:false }
-  try {
-    global.ssl_info.ssl_domains[ssl_domains[i]].key = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/privkey.pem','utf8');
-    global.ssl_info.ssl_domains[ssl_domains[i]].cert = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/fullchain.pem','utf8');
-    //global.ssl_info.ssl_domains[ssl_domains[i]].ca = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/chain.pem','utf8');
-    global.ssl_info.ssl_domains[ssl_domains[i]].secureContext = require('tls').createSecureContext({
-      key:  global.ssl_info.ssl_domains[ssl_domains[i]].key,
-      cert: global.ssl_info.ssl_domains[ssl_domains[i]].cert
-    });
-    global.ssl_info.ssl_domains[ssl_domains[i]].enabled = true;
-    global.ssl_info.key = global.ssl_info.key || global.ssl_info.ssl_domains[ssl_domains[i]].key;
-    global.ssl_info.cert = global.ssl_info.cert || global.ssl_info.ssl_domains[ssl_domains[i]].cert;
-    //global.ssl_info.key = global.ssl_info.ca || global.ssl_info.ssl_domains[ssl_domains[i]].ca;
-    global.ssl_info.enabled = true;
-  } catch(e) {
-    console.error("There was a problem getting SSL keys for "+ssl_domains[i]+".\nThis could be because the server is local.\nThis server won't be running in SSL.");
-    log_error(e);
-  }
-}
-//console.log(global.ssl_info);
-
-// Valid source IP Addresses that can submit new trade messages
-let whitelisted_sources = [
-    '1',
-'127.0.0.1',
-'10.10.10.1',
-'81.103.52.7'
-];
-let blacklisted_ips = [
-  //'162.158.*.*'
-];
 let sockets_by_ip = {
 
 }
@@ -96,71 +45,7 @@ global.stats = {
   connected_sockets:0,
   most_connected_sockets:0
 };
-function getUserAgent(req) {
-  let ua = '';
-  if(typeof req.headers == 'function')
-    ua = req.headers('user-agent');
-  else if(typeof req.headers != 'undefined')
-    ua = req.headers['user-agent'];
-  else if(typeof req.get == 'function')
-    ua = req.get('user-agent');
-  return ua;
-}
-function getIP(req) {
-  let ip = req.connection.remoteAddress;
-  if(typeof req.header != 'undefined')
-    ip = req.header('x-forwarded-for') || ip;
-  return ip.split(':').pop();
-}
-function isLocal(req) {
-  return  getIP(req) == '127.0.0.1';
-}
-// Should this request be gzip compressed?
-function shouldCompress (req, res) {
-  if(/stats/.test(req.url))
-    return false; // Disabled for /stats endpoint.
-  return compression.filter(req, res);
-}
-// Has this request object come from a trusted source?
-function isValidTradeSource(req) {
-  return isWhitelisted(req);
-}
-function isWhitelisted(req) {
-  return whitelisted_sources.indexOf(getIP(req)) != -1;
-}
-function isBlacklisted(req) {
-  let ip = getIP(req);
-  if(!ip) return true;
-  let parts = /([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/.exec(ip);
-  if(!parts) return false;
-  let wildcards = [
-    parts[1] + '.*.*.*',
-    parts[1] + '.' + parts[2] + '.*.*',
-    parts[1] + '.' + parts[2] + '.' + parts[3] + '.*',
-    ip
-  ];
-  for(let i in wildcards) {
-    if(blacklisted_ips.indexOf(wildcards[i]) != -1)
-      return true;
-  }
-  return false;
-}
-function isPreSearing(request) {
-  if(typeof request.is_presearing != 'undefined')
-    return request.is_presearing ? true : false;
-  let referer = request.header ? request.header('Referer') : false;
-  if(referer && /presear|ascalon/.test(referer))
-    return true;
-  if(typeof request.path == 'string' && /presear|ascalon/.test(request.path))
-    return true;
-  let host = false;
-  if(request.hostname) host = request.hostname;
-  else if(request.headers && request.headers.host) host = request.headers.host;
-  else if(request.host) host = request.host;
-  if(typeof host == 'string' && /presear|ascalon/.test(host))
-    return true;
-  return false;
-}
+
 
 function extendedStats() {
   let getSocketInfo = function(ws) {

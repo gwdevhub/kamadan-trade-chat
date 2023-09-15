@@ -79,7 +79,7 @@ if(!global.server_modules_included) {
   function preload() {
     console.log("\n---------- Loading Modules via require() ----------\n");
     eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
-    
+
     console.log("\n---------- Loading Helper Functions/Classes ----------\n");
     var helper_functions = [
       __dirname+'/js/String.class.js',
@@ -115,7 +115,7 @@ if(!global.server_modules_included) {
     }
     console.log("Scripts Loaded:");
     for(var i in global.serverScripts) console.log("  serverScripts."+i+" = "+(typeof global.serverScripts[i]));
-    
+
     return Promise.resolve();
   }
 
@@ -146,40 +146,6 @@ if(!global.server_modules_included) {
     }).finally(function() {
       //console.log("repeat_script for "+script+" finished, reqeueing...");
       setTimeout(function() { repeat_script(script,interval) },interval);
-    });
-  }
-  // Promosified shell command
-  async function cmd(cmd, log_output = true, throw_on_fail = true) {
-    return new Promise((resolve, reject) => {    
-      let stdout_buf = '', stderr_buf='', options = {};
-      let first_arg = cmd;
-      if(typeof cmd == 'string') {
-        options.shell = true;
-        cmd = [];
-      } else {
-        first_arg = cmd.shift();
-      }
-      let spawn_args = [first_arg,cmd,options];
-      console.log(' >>> '+([first_arg].concat(cmd).join(' ')));
-      let proc    = spawn.apply(exec,spawn_args);
-      proc.stdout.on('data', function (data) {
-        if(log_output) console.log(' <<< ' +data.toString());
-        stdout_buf += data.toString();
-      });
-
-      proc.stderr.on('data', function (data) {
-        if(log_output) console.log(' <<< '+data.toString());
-        stdout_buf += data.toString();
-      });
-      if(throw_on_fail)
-        proc.on('error', reject);
-      proc.on('exit', function (code) {
-        if(code != 0 && throw_on_fail) {
-        console.log(' <<< '+stdout_buf);
-        return reject(code);
-      }
-        return resolve(stdout_buf);
-      });
     });
   }
 }
