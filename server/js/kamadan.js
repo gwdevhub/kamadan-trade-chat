@@ -1,11 +1,36 @@
-var GuildWars = {
+async function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve,ms);
+  });
+}
+/*async function waitFor(eval_func,timeout = 5000) {
+  let elapsed = 0;
+  while(elapsed < timeout) {
+    let res = eval_func();
+    if(res) return res;
+    await sleep(50);
+    elapsed += 50;
+  }
+  return false;
+}*/
+async function fetch(endpoint) {
+  return new Promise((resolve,reject) => {
+    let req = new XMLHttpRequest();
+    req.addEventListener("load", () => resolve(req));
+    req.addEventListener("error",() => reject(req));
+    req.open("GET", endpoint);
+    req.send();
+  });
+}
+
+window.GuildWars = {
   getItemName:function(model_id) {
-    var item = this.getItem(model_id);
+    let item = this.getItem(model_id);
     return item ? item.name : "Unknown Item";
   },
   getItem:function(string) {
     // Get by model id
-    var numCheck = parseInt(string);
+    let numCheck = parseInt(string);
     if(!isNaN(numCheck)) {
       if(this.common_materials[numCheck])
         return this.common_materials[numCheck];
@@ -15,25 +40,25 @@ var GuildWars = {
     }
     // Search by name
     string = string.toLowerCase().trim().replace(/s$/,'');
-    var checkItem = function(mat) {
-      var name = mat.name.toLowerCase();
-      if(name == string)
+    let checkItem = function(mat) {
+      let name = mat.name.toLowerCase();
+      if(name === string)
         return mat;
       name = name.replace(/^(bolt|glob|vial|lump) of /,'').replace(/ingot/,'');
-      if(name == string)
+      if(name === string)
         return mat;
-      if(mat.aliases && mat.aliases.indexOf(string) != -1)
+      if(mat.aliases && mat.aliases.includes(string))
         return mat;
       return null;
     }
-    var found = null;
-    for(var i in this.common_materials) {
-      if(found = checkItem(this.common_materials[i]))
-        return found;
+    let found = null;
+    for(let i in this.common_materials) {
+      found = checkItem(this.common_materials[i]);
+      if(found) return found;
     }
-    for(var i in this.rare_materials) {
-      if(found = checkItem(this.rare_materials[i]))
-        return found;
+    for(let i in this.rare_materials) {
+      found = checkItem(this.rare_materials[i]);
+      if(found) return found;
     }
     return null;
   },
@@ -94,7 +119,7 @@ var GuildWars = {
     955:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWIRQtenVfAAACr0lEQVQ4T+2TS0wTURiFTzvt0DJ9wJRCgZaClEdrwEAkJSAEiYqRxAgRxLg26sK9C2N059qViYkbNixMRDeKMWpUkJRA8FEeJbQCI7QdKKWPKbbQ8Q5WLVH3LjzJlzOT+5+Tm7l38F//gGQZ/5PkGZeUzvhvojK+T0UoYu4ODd6+cvnSabVWaXVPTAV2AIEs/bUoW7K62rrmV2OunbculzjjmRNv3rg+StOoIWvK7yO/lL0Dymw2lzhbWprDsUhlWZXtTJWtCgyjQ3vbEUs8Gq3/5H4/nkqlw2T25072CoxGo6a//+y18xcGHtodtr6SQlOb3lDMWC0VCIc2sRWJotZ+0LrKrVk8Hs8YiUQIopSVClRdp7runezquCqT7cpZllX6+QjDrfCwWkoh7iaxtLRMfBu95wYOOOy1zmg8ElheWl4l2RTV6jx8vNnZcEun1ynkcjmCQR4f3fOYn3FjazMIRqMDx3EYfjCINT9PdR4/UdbT09tbVVNpHHky4qY6jnXewU68ViQnGo3F8Xr0HQpMFqgpJfINRvg+L+Lli2dIpRJY5nzgVnzYCPEKu8PRRKtoE8WtcId0BXmtlEIJ39IqyirqUVRYjPw8PXSsDrbqSjQ2NUIhozA360ZKiGI9EMTzkafg10MCRZoTIT/fEI8LJq/XKyuvqMPGxhcser0QhCS+CtsIr/OQi2lMT0+JXt+KsB4MKIR4LD0zu3BfuolG8iUbNVpVdzKZMuhZtrjJ2X6U0WogRLZABhEO8ygs0GBsfNoViyQe5dAKs0wGNpZIDkkFElpCKYGRClW5ORdLTaZu1mCiJicnHqtzaF4Ut8XtJD6k03hDZnYzmdXsf+HHcx6hmtVp+mg1U+IPBIbJ+wJBCknnv0ZIEmjJswuylUsoJ+gJiwSesHdx9gv4Bvc3ChbsFYviAAAAAElFTkSuQmCC",
     935:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWIQ+nH7yzAAACgklEQVQ4T9WSX0hTURzHv7vbnNe7v6yltqyQJmEhRg9FPYSBD700NSUiKoMeCgl6DPpD+OBDD/UWUQ/2YtRDidaDUSFlVtQw/+VsarbNOd24azov267Xrd+5DJkU4kMvfeHD5Zzz/X3vOb9z8P9Lm/tuVBrCRHCEwiY2KlZgrj16rOVZ1/MAdDhM4wJ1ZQPSNTefdz9o70h4xgLZl2/6FV7gL9H8JrbIktcTX9fQeKPp9Lknm0sqjKFwCINfBzhncWkRram16wU4L1643NV8tuW6wBcZBMEAC29AYkHUZBRZn/P8NYBzVbqq26629Zw6fqbWajOrJqu5EBk5hYb6BmQ1GhbAGvpHgL6mpqbxzu2778v3Htoz/PMHysu3oWq3C7sqtsKgy8BsskHO678u92XSX7vZ2uquc19JK3bsqxZgsfIo0OsRFWOY8M2j1LkdiwkOGeiyuZo1Oyh02OxHel/3Q1pOoYDOy3FaDA6N4YtnFEaTAeMBEbd63srxxV8x8qsh+QFGjtPvPHBwP6pcDhoqePfxE+bmRZjMVnR+C6P98xgi/olIMhEPkkFiRfkBOlBzTIU8Qv5pBP1+pDJZSIIRT30BePwx2C0OJOemRskbJtKsaE0Ty0pLtJGgF93d3Uim0hifX8LDDz4Mh5MQeB6GFQnf+14MkjVCqK1cEyDJS4qX/lbfdBL3BkT0BpeznFarVO5wyOnJEXGmv7MvFokNkZX1QJV6lzmV3e945NGaLbbHr4bjfu/ItDjj8y7NTs2uSJKoKHKCPFHCS0wS6g7yA+x2h+MEzW5ZiEZDNGbbZGeN58gQLISdffUl5Aew11VMCMQiwbqcIpaJ1Xv/xwJ+A3Of5i4zNQNcAAAAAElFTkSuQmCC",
     943:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfbAxAWIRAqF7FGAAAABmJLR0QA/wD/AP+gvaeTAAADBUlEQVQ4y6WUTY7cRACFP1e5bJftcf9lkklIJiLKAqFILJAicQJuwAm4BwdC3IANEms4AKOAQjRiMj3dHrfb5SqXq9iMBBpmxyc96UlPb/vBP2RAci/3+c+eALx9vf789cvld49X9e+jF+bi/baPaXIhs+zDus7CH++vVJVmazPz6ZuXm822O0opxdX3P737IQXkel19vWn0N4ejYb1a8Nn5EplGzs7W2Gnk1aMMJjh6TxICT5eKi6vjz8AvAlBFxpe9seQqwY0DSTLT6JLt9Y7+dmCaPAfTY4db6rIEZmolbgEjgLLW+itnLboo2Xd7YrQYO6JzzXKxICQJUpeUVc3ETFHmXLZ2AFz6bHNy6uzheaUlKpOcP32BCYZSKLb7Fm1LsrSgP46M00RqZ5yP/Hnd/wY48eJR82azXGSZ0nSHniRNWVVrpghZpnDWMU2BeerJtSQrcqqy5DDON0CXrprs7ThFmlID4PxEjIHucGS5WDDPASEk0FA3Gm89UiqiDxOAqMv0i6oomAOQJBhjsT6QFxXOB0Y3oYqUullAzCARWGupS50DCBviR6kkxk0kIsc6z4zEzTNtP7BYnnK9+4vgR0LIkaogy2tOl+UrQInuMFx23UBTlRBHnqwbTHdJiueTJxv6w45Gr7GTp9ae6C15oTh/vjwD6rTW2hZ5wXbXAjMQiUmJnWb2XQsh4lygWTT0g2F0DpWOLLVcAUrsO3s8DiN5rlktN+zbA4OZWC1XOBvJ8pzV+oTbvkcIiZQSN3ti8I+BWty0wztjDPMcuO0OZCqn1prrm4G2Hdnteuw4kQDd0BOIzHMgibECCtGb6YOUAjMY5llifMr11mC9YLQeZyPdrSUN0A2Ww3CkLjWrSimgTI9Bmm0X21Wd69lF3DRS5DrZt4fEO/A+iClEkYgpqXWBNYb9bk8/2FKCSNu2/fjjr+23wDMhSAAhEIJUyFQg80RWWSZPMiVSKRKRKaWqqiilyKv5zgcpsPiXUO5TA+puk3edu9/1Q4eHLPQQGeD4v/wNVhh/ypMtp9wAAAAASUVORK5CYII=",
-    942:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWIRVafUXJAAADEUlEQVQ4T92T204TURSG1xw7PVCm9EChHESxgIBRQmI4KBETTTB664VeGXkGX8AYr43PoHeQqInGBAjRRKMxKh4QRYQepLTQTmdKO8dd165A0BgfwD/5svfOrP+fmbX3hv9TQhjAhyP7a/lvcTvjns50BU95A+6RdL6yhksboTVV+uxv+jNA6gy7blwZjVz1cMxAW0C83NvkHVzaqLzDZ84Ov2l/ADsWD5wY7wtdl0Q+GvS6e2S3EE8pesl2GI5hWL9uOTrWUegX1b5qf4Dv2lj7dCzk7tgqGrBdtqCALKyqpZGu8HhEdh0Pe7i4x8W2uBhgNZMo6DF3A7jJk82XsHBSMywmFvJA18EIJDaKm+N90dD5odYIxwktPSF+cPiQPJHM6/VJxXyBvsJup+XWEH9rQ1WY7jYf1Hl4MLZV6GyUQgPxYF0ii/OIxBzrizFF3bZNi3Sgpx5haQAz0R8cxXk0Hg3Cas6GtYQCBdWABr8IC2s5aJQlbJ8OGQzy1nucpGY/Rp+J1PZa7G33DQ8cCoKFi4+reWhsrIN1RQORr4KbByDYfJfIgF3W4Mmr1OJG0XiDpWmEsPi7DYbDXJh6mUqtbWpw+ngrtDSH4dxQGywnCnAsHgafRwCjbMKHpJZ7uly8j8YvSBEBzstzZ7/8KLXwDHPkaIcsOrYFW5oOtmlDLBqA72kNXn/KgmVaYBLR2izZiYxqzqKX7gJwboEb8wuslC9ZapOflzfzmrf3YBhW09vwNVWCTKECF08eAMktkJsPVu5+Xi/Po+8botUCKjap5nUnrdugd8viyNGYj3v4NptSSts+iSeszwVq/+Gg696z9OLs+8IUqVbn0JdBCA2gTVxCnnsEZkWxSeH2/PojXTUCb1a05YoJP+7MZKZnXueNLYUVHCD0rfTf6R2piR4kuh1mxa46Jqn6l3OVrxWTbOU0kppdUubyZedFX6yuaX4x+zarmc+wdveS1cTsjFT0YMQQemEaEBEpI7mYLI2uqzpLCNDmpZA97Q+goiZ6HOi4K3ppmhE8EZBEDGRHAD8BSY5KjTLZZOkAAAAASUVORK5CYII=",
+    //942:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWIRVafUXJAAADEUlEQVQ4T92T204TURSG1xw7PVCm9EChHESxgIBRQmI4KBETTTB664VeGXkGX8AYr43PoHeQqInGBAjRRKMxKh4QRYQepLTQTmdKO8dd165A0BgfwD/5svfOrP+fmbX3hv9TQhjAhyP7a/lvcTvjns50BU95A+6RdL6yhksboTVV+uxv+jNA6gy7blwZjVz1cMxAW0C83NvkHVzaqLzDZ84Ov2l/ADsWD5wY7wtdl0Q+GvS6e2S3EE8pesl2GI5hWL9uOTrWUegX1b5qf4Dv2lj7dCzk7tgqGrBdtqCALKyqpZGu8HhEdh0Pe7i4x8W2uBhgNZMo6DF3A7jJk82XsHBSMywmFvJA18EIJDaKm+N90dD5odYIxwktPSF+cPiQPJHM6/VJxXyBvsJup+XWEH9rQ1WY7jYf1Hl4MLZV6GyUQgPxYF0ii/OIxBzrizFF3bZNi3Sgpx5haQAz0R8cxXk0Hg3Cas6GtYQCBdWABr8IC2s5aJQlbJ8OGQzy1nucpGY/Rp+J1PZa7G33DQ8cCoKFi4+reWhsrIN1RQORr4KbByDYfJfIgF3W4Mmr1OJG0XiDpWmEsPi7DYbDXJh6mUqtbWpw+ngrtDSH4dxQGywnCnAsHgafRwCjbMKHpJZ7uly8j8YvSBEBzstzZ7/8KLXwDHPkaIcsOrYFW5oOtmlDLBqA72kNXn/KgmVaYBLR2izZiYxqzqKX7gJwboEb8wuslC9ZapOflzfzmrf3YBhW09vwNVWCTKECF08eAMktkJsPVu5+Xi/Po+8botUCKjap5nUnrdugd8viyNGYj3v4NptSSts+iSeszwVq/+Gg696z9OLs+8IUqVbn0JdBCA2gTVxCnnsEZkWxSeH2/PojXTUCb1a05YoJP+7MZKZnXueNLYUVHCD0rfTf6R2piR4kuh1mxa46Jqn6l3OVrxWTbOU0kppdUubyZedFX6yuaX4x+zarmc+wdveS1cTsjFT0YMQQemEaEBEpI7mYLI2uqzpLCNDmpZA97Q+goiZ6HOi4K3ppmhE8EZBEDGRHAD8BSY5KjTLZZOkAAAAASUVORK5CYII=",
     6533:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWIRlTywniAAACIklEQVQ4T2MYGYAFSpMOZHTVdfX9HXuBTEGICCZggtLYAKO0rqwFjyhXvm6oQxSQzwkRRgXMUJrBLtVT1zjCNeEfFyfP25uPnoHE1N2M87kEefSZmBidX999tv3P91+vgML/QHIwADZAXE+PW1xXaquUglzMP3aWSFF1dWEJXaUfjKz/cv78+SPw//sfljf3nh/4+eX7TaDyPyA9MAD2wsdXj0QYmBkVnj15wsDPz8PMys6cpWytv+vzty/y3379YmAXEGTgEuRVAiplBalHBmADfrz48PHT03frGFgYGf7++8GgoC3C8PfHdwaW/2wMn56/ZXj76gUDlwSPDFAphgGwMPjzl/H/FzFbnWgWDj7GP19/MXz58JLB3NuJgZ2NheHT53cMvILiP56evbkFqPYjRAsEwGLhz6sL969wf/x9+vu71wzvHr5g+PP2G0OWZQiDorIqg5C4BAM7B4c8UB0oOlHSBXI0vvt358NidyPbLwZGpgzhAREM779/YtCSVWEQ4uJj+PDgxU+gGpBmRrBqKEDmgAwT5+HhsZLWVLJm42FVEFOTYvGPifBl+MPIsGPzzuPb+hamANXcAGKUqEQGIEP4gVgBiLWA2MGnKvbplCOr/muZ6rcC+bJAjALgCQkK/gMxyKkfgPgdEL/+y8r0+9nXd5KnV+2eD+SD0sEvICYaMLLz8Slz8nMGANkgVyGHGdGADYgFgBgjDQwGwMAAAEwPoYam/5xmAAAAAElFTkSuQmCC",
     942:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWIR7Nr5xBAAACyUlEQVQ4T9VUS47cNhB9JEWR7Ja6e2Z6jABeJ0C8yAmy8glygCxzmNzCx/DOWSTI2l4bSBbOwvHM9Ed/khLlp/Y4CIxcIAU8sVpiFV/VKzb+/yYe1+xx/dJmYvrk/rctCbY/fv/s5/3G3Yahw/3pw9h1qQ8pP2+cvvejeLgudA8oDLFFgsb7Y1f/+ufdK8YehQOe/vT82zdFNt/MIWCSGWKKCOMEt3LwfkSKCWmWkIkJdAGfxPsXv7/9gQleS6P1tUiTmaYRq3UOIwbscoOntzvsyxV2JkNpFQoroFYFxtgz4aAYfENAZhrZGIIRLNcaDWs1rgqLuT9Bixn72z2cs5D8ro2Fs46evMReHiutRbktFFJC3dS42lzRHbDdlMDo0VYHBgrYtYNWGeq6wcPhGBk7XBJoHYUSQhproZTFqfHww4SmmzAMEVIIpHFGEz2qwx022zX74NjUT+pIlxd5tlAvS0gmmZ1Btrbs+ICMNSepSZkMhIHb7BhiKO5c00nELPvoNxkb0ZLaKrew3HyuK2RaUgkyVRJtGNF5TyVm9EOLIfiGwRURqIL6qq34myedqorBDUIcEfrEdcLxVCNSXp27y2qsgXVm6cEyZJClzvZjEmjbFn+9e8cTPEzGzTJHYpVD3+Fwf2Q/OCNzumDhTgvLQ1JzJ0kt+A43T25YFBtG6j2nsmsrKjKhfLKH0Bl9CU9257b9F4NdiXzR/nrPcg1i07F+zidZaDZxvd1BCEUpcyhO6NQRUS0qXEzmcmnWxBloUbH+JDS63mNa3vWBagiEpYksRTqH5cB6GNvHeKhrp589HE/fnOq+jkk0d13fUP4+xDgczu147gaOGG+dykWKE4dixtsP9S/HIf7G16flNn5NfEeQ9z+miZyzqjiwjtfIkihdybmalY/TH0z6knvulgTL5oL4/N/wpW2I5fIs9nmPJ/4GED4CU9NlvfxVEwgAAAAASUVORK5CYII=",
     922:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWISAMzoHqAAADfElEQVQ4T8WTS28bVRTH/3Pn/bLjx/iRkNTBpFEVtWmAEFUsQCphURZISAghVlV3fADEN6AL2PANkFghJDasWCBakqqVQICsJE0drCZOmrjx2B577PGMZzwcQxOJRcWSv/Sbc0f33HvPPedc/O/in9nn6b/mn+sgEqn52eInna67Vy6X31xZWVvt9ruW1+/bNBf87UXintlzFYvFrKkq34yZn+Ni4aIoqnVzKp1fWFzSW53TePPnn245Ledbcu1N/M8jSCaTKU3TrCjy31dV9rGRyOQSZoq3e62UKEuS023C93wuaWgLPBebsiCpg+GwcRaBsnxl8YsrV1+7OaUnFU4SuI3Ne/C8AR3B4DpNXCi9iHEc4rh+QGFzEDjBa9idj3hVVaf1pH51plh8o9vtLB+cNDiyeFyrgRclyLKM4dBD4EcIohFGQQjGGATG+83T5j2WMtXbCd34zhsGqxyTKSs8Gk8bmLtQwo0b70CRBSiqAkES6FwGSdUhCBI6Pfe+H4Y11rCdr3RB3GIQS4OBj37PQTo5hXK5hN3dbXi+h8WLl8GxEIqkIGXqiONw0Go7P9DVqyyKokp1v/7ZUX3/QcJQsf72OkImouc4iKMQIuORzaRx+vQYEi9A0wyoiqmapjmmDbqMPqeGYXhWITv/5LiOjbt3EQQBNjbv0EkxXr92HTPFOah6CvMvLSKgxLpu2x0MXMrwP2VMrK6u3NZU7ZXZUgkN2sTptHF5+VVk03nYto3K1q8wkwnk8tNod2xQNoK2072Tz2RFfmlh4YP5cvlTy8qjtlcF4jFMw4BVmIU36OPgoAbHtaHrGkb+CK1mA5lMVk4nzbcMWSmwmUL23SjwqDw+deEcOt0hJEXFyOvhsL4DUxNhpYsIqZQjupqsSBBFhjDwaw/+qHzPmq1mdZKcdquJnuuAcSIOqQf+fLQLLtbhOEPkrDQ0kcfKyjWwKMbezsNHv1d2v6br3+fbvcFwOp96j0qsWNkcWOjBG4egdsXy0iWIkjhuHJ9s2R1nJ6HLpeHA6/9W2fkyHI8nZXw4aeXptZcvfV7IFz98XD/aPjqsb1OcAhfGwigKrDAcVV032BRF0XlhJrd+9KSxHwThj7TuF8KbbCApirKmq/J1u+2c0D9lEiExkUE4RJ1wiQIRExO/9mR89phShEV4xCkxcTrTZHz+/v8t4C96JHZiGIxMwgAAAABJRU5ErkJggg==",
@@ -119,35 +144,35 @@ var GuildWars = {
     941:"iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAYAAACEYr13AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAGYktHRAD/AP8A/6C9p5MAAAAHdElNRQfbAxAWIRVafUXJAAADEUlEQVQ4T92T204TURSG1xw7PVCm9EChHESxgIBRQmI4KBETTTB664VeGXkGX8AYr43PoHeQqInGBAjRRKMxKh4QRYQepLTQTmdKO8dd165A0BgfwD/5svfOrP+fmbX3hv9TQhjAhyP7a/lvcTvjns50BU95A+6RdL6yhksboTVV+uxv+jNA6gy7blwZjVz1cMxAW0C83NvkHVzaqLzDZ84Ov2l/ADsWD5wY7wtdl0Q+GvS6e2S3EE8pesl2GI5hWL9uOTrWUegX1b5qf4Dv2lj7dCzk7tgqGrBdtqCALKyqpZGu8HhEdh0Pe7i4x8W2uBhgNZMo6DF3A7jJk82XsHBSMywmFvJA18EIJDaKm+N90dD5odYIxwktPSF+cPiQPJHM6/VJxXyBvsJup+XWEH9rQ1WY7jYf1Hl4MLZV6GyUQgPxYF0ii/OIxBzrizFF3bZNi3Sgpx5haQAz0R8cxXk0Hg3Cas6GtYQCBdWABr8IC2s5aJQlbJ8OGQzy1nucpGY/Rp+J1PZa7G33DQ8cCoKFi4+reWhsrIN1RQORr4KbByDYfJfIgF3W4Mmr1OJG0XiDpWmEsPi7DYbDXJh6mUqtbWpw+ngrtDSH4dxQGywnCnAsHgafRwCjbMKHpJZ7uly8j8YvSBEBzstzZ7/8KLXwDHPkaIcsOrYFW5oOtmlDLBqA72kNXn/KgmVaYBLR2izZiYxqzqKX7gJwboEb8wuslC9ZapOflzfzmrf3YBhW09vwNVWCTKECF08eAMktkJsPVu5+Xi/Po+8botUCKjap5nUnrdugd8viyNGYj3v4NptSSts+iSeszwVq/+Gg696z9OLs+8IUqVbn0JdBCA2gTVxCnnsEZkWxSeH2/PojXTUCb1a05YoJP+7MZKZnXueNLYUVHCD0rfTf6R2piR4kuh1mxa46Jqn6l3OVrxWTbOU0kppdUubyZedFX6yuaX4x+zarmc+wdveS1cTsjFT0YMQQemEaEBEpI7mYLI2uqzpLCNDmpZA97Q+goiZ6HOi4K3ppmhE8EZBEDGRHAD8BSY5KjTLZZOkAAAAASUVORK5CYII="
   }
 }
-var common_materials_sorted = Object.keys(GuildWars.common_materials).sort(function(a,b) {
-  return GuildWars.common_materials[a].name.localeCompare(GuildWars.common_materials[b].name) > 0;
+let common_materials_sorted = Object.keys(GuildWars.common_materials).sort(function(a,b) {
+  return GuildWars.common_materials[a].name.localeCompare(GuildWars.common_materials[b].name);
 });
-var rare_materials_sorted = Object.keys(GuildWars.rare_materials).sort(function(a,b) {
-  return GuildWars.rare_materials[a].name.localeCompare(GuildWars.rare_materials[b].name) > 0;
+let rare_materials_sorted = Object.keys(GuildWars.rare_materials).sort(function(a,b) {
+  return GuildWars.rare_materials[a].name.localeCompare(GuildWars.rare_materials[b].name);
 });
-for(var i in GuildWars.common_materials)
+for(let i in GuildWars.common_materials)
   GuildWars.common_materials[i].model_id = i;
-for(var i in GuildWars.rare_materials)
+for(let i in GuildWars.rare_materials)
   GuildWars.rare_materials[i].model_id = i;
 // Items to show in top bar for price quotes.
-var price_quote_summary_items = {930:1,933:1,934:1};
-for(var i in GuildWars.item_icons) {
+let price_quote_summary_items = {930:1,933:1,934:1};
+for(let i in GuildWars.item_icons) {
   if(/http/.test(GuildWars.item_icons[i]))
     continue;
   GuildWars.item_icons[i] = 'data:image/png;base64,'+GuildWars.item_icons[i];
 }
 
-var KamadanClient = {
+window.KamadanClient = {
   poll_interval:3000,
   ws_interval:60000,
   debug:/local/.test(window.location.hostname),
   isVisible:function() {
     if (typeof document.hidden !== "undefined")
-      return document.hidden == false;
-    if (typeof document.msHidden !== "undefined")
-      return document.msHidden == false;
-    if (typeof document.webkitHidden !== "undefined")
-      return document.webkitHidden == false;
+      return document.hidden === false;
+    if (typeof document['msHidden'] !== "undefined")
+      return document['msHidden'] === false;
+    if (typeof document['webkitHidden'] !== "undefined")
+      return document['webkitHidden'] === false;
     return true;
   },
   onVisibilityChange:function() {
@@ -155,22 +180,16 @@ var KamadanClient = {
       this.connect();
       this.log("Window is now visible");
     } else {
-      this.disconnect();
+      this.disconnect().catch(this.error);
       this.log("Window hidden");
     }
   },
-  disconnect:function() {
-    var self=this;
-    if(self.ws) {
-      try {
-        self.ws.close();
-        setTimeout(function() {
-          delete self.ws;
-        },250);
-      } catch(e) {
-        // Silent
-      }
-    }
+  disconnect:async function() {
+    if(!this.ws)
+      return;
+    this.ws.close();
+    await sleep(250);
+    delete this.ws;
   },
   connect:function() {
     this.pollWebsocket();
@@ -215,28 +234,28 @@ var KamadanClient = {
     this.redrawMessages();
   },
   loadMore:function() {
-    if(this.current_display != 'search' || !this.search_results.length || this.searching)
+    if(this.current_display !== 'search' || !this.search_results.length || this.searching)
       return;
-    var earliest_msg = this.search_results[this.search_results.length - 1];
-    if(this.last_searched_offset == earliest_msg.t)
+    let earliest_msg = this.search_results[this.search_results.length - 1];
+    if(this.last_searched_offset === earliest_msg.t)
       return; // Reached end of results
-    this.search(this.last_search_term,earliest_msg.t);
+    this.search(this.last_search_term,earliest_msg.t).catch(this.error);
   },
-  search:function(term,offset) {
+  search:async function(term,offset) {
     this.hidePricingHistory();
     if(term)
       this.search_input.value = term;
     term = this.getSearchTerm();
     offset = offset || 0;
-    var endpoint = '/s/';
+    let endpoint = '/s/';
 
     if(this.searching)
       return;
     this.searching = 1;
-    
+
     this.last_search_date = Date.now();
     this.last_searched_offset = offset;
-    if(this.last_search_term != term || offset == 0) {
+    if(this.last_search_term !== term || offset === 0) {
       this.search_results = [];
       this.clearMessages();
       window.scrollTo(0,0);
@@ -246,42 +265,31 @@ var KamadanClient = {
       this.clearSearch();
       return;
     }
-    var self = this;
-    var req = new XMLHttpRequest();
     this.current_display = 'search';
     this.redrawMessages();
     document.getElementById('search-info').innerHTML = "Searching for <i>"+term+"</i>...";
-    req.addEventListener("load", function() {
-      var result = [];
-      try {
-        if(this.response.length)
-          result = JSON.parse(this.response);
-      } catch(e) {
-        self.error(e);
-      }
-      self.search_input.value = self.last_search_term = term;
-      self.current_display = 'search';
-      self.parseSearchResults(result);
-      self.searching = 0;
-    });
-    req.addEventListener("error",function() {
-      self.search_input.value = self.last_search_term = term;
-      self.current_display = 'search';
-      self.parseSearchResults([]);
-      self.searching = 0;
-    });
-    req.open("GET", endpoint+encodeURIComponent(term)+'/0/'+offset);
-    req.send();
+    let result = [];
+    try {
+      let response = await fetch(endpoint+encodeURIComponent(term)+'/0/'+offset);
+        if(response.response.length)
+          result = JSON.parse(response.response);
+    } catch(e) {
+      this.error(e);
+    }
+    this.search_input.value = this.last_search_term = term;
+    this.current_display = 'search';
+    this.parseSearchResults(result);
+    this.searching = 0;
   },
   setPollInterval:function(ms) {
-    var new_interval = Math.min(120000,ms);
-    if(new_interval != this.poll_interval)
+    let new_interval = Math.min(120000,ms);
+    if(new_interval !== this.poll_interval)
       this.log("Poll interval set to "+ms+"ms");
     this.poll_interval = new_interval;
   },
   setWebsocketInterval:function(ms) {
-    var new_interval = Math.min(120000,ms);
-    if(new_interval != this.ws_interval)
+    let new_interval = Math.min(120000,ms);
+    if(new_interval !== this.ws_interval)
       this.log("Websocket interval set to "+ms+"ms");
     this.ws_interval = new_interval;
   },
@@ -289,12 +297,12 @@ var KamadanClient = {
     return this.messages ? this.messages[0] : null;
   },
   getMessageById:function(id) {
-    for(var i in this.messages) {
-      if(this.messages[i].t == id)
+    for(let i in this.messages) {
+      if(this.messages[i].t === id)
         return this.messages[i];
     }
-    for(var i in this.search_results) {
-      if(this.search_results[i].t == id)
+    for(let i in this.search_results) {
+      if(this.search_results[i].t === id)
         return this.search_results[i];
     }
     return false;
@@ -305,37 +313,36 @@ var KamadanClient = {
     this.pricing_history.to_original = this.pricing_history.to.clone();
     this.current_wrapper = document.getElementById('current-wrapper');
     this.page_wrapper = document.getElementById('page');
-    this.results_header = document.getElementById('results-header');
     this.table_wrapper = this.current_wrapper.parentElement;
     this.search_input = document.getElementById('search-input');
     this.listings_div = document.getElementById('listings');
     this.footer = document.getElementById('footer');
     this.websocket_url = "ws://"+window.location.hostname;
     this.notify_popup = document.getElementById('notify_popup');
-    if(window.location.protocol == 'https:') {
+    if(window.location.protocol === 'https:') {
       this.websocket_url = "wss://"+window.location.hostname;
     }
     this.last_search_term = this.getSearchTerm();
     this.search_results = window.search_results || [];
-    
-    var self = this;
+
+    let self = this;
     document.addEventListener('visibilitychange', function() { self.onVisibilityChange(); }, false);
     document.addEventListener('msvisibilitychange', function() { self.onVisibilityChange(); }, false);
     document.addEventListener('webkitvisibilitychange', function() { self.onVisibilityChange(); }, false);
 
-    this.notify_popup.addEventListener('click',function(e) {
+    this.notify_popup.addEventListener('click',function() {
       self.onNotifyClose();
     });
-    
+
     this.current_wrapper.addEventListener('click',function(e) {
-      if(e.target.className != 'delete')
+      if(e.target.className !== 'delete')
         return;
-      var message = self.getMessageById(e.target.parentElement.id);
+      let message = self.getMessageById(e.target.parentElement.id);
       if(!message)
         return;
       self.promptDelete(message);
     });
-    document.getElementById('page').addEventListener('click',function(e) {
+    document.getElementById('page').addEventListener('click',function() {
       document.getElementById('trader-prices').classList.remove('showing-overlay');
     });
     document.getElementById('trader-summary').addEventListener('click',function(e) {
@@ -345,41 +352,41 @@ var KamadanClient = {
     document.getElementById('trader-summary').parentElement.addEventListener('click',function(e) {
       e.stopPropagation();
     });
-    document.getElementById('reset-zoom').addEventListener('click',function(e) {
+    document.getElementById('reset-zoom').addEventListener('click',function() {
       self.resetZoom();
       self.resetTimeline();
     });
-    var days = 30;
-    document.getElementById('graph-prev').addEventListener('click',function(e) {
+    let days = 30;
+    document.getElementById('graph-prev').addEventListener('click',function() {
       self.resetZoom();
       self.pricing_history.from.modify('-'+days+' days');
       self.pricing_history.to.modify('-'+days+' days');
-      self.showPricingHistory();
+      self.showPricingHistory().catch(self.error);
     });
-    document.getElementById('graph-next').addEventListener('click',function(e) {
+    document.getElementById('graph-next').addEventListener('click',function() {
       if(self.pricing_history.to.getTime() >= (new Date()).getTime())
         return;
       self.resetZoom();
       self.pricing_history.from.modify('+'+days+' days');
       self.pricing_history.to.modify('+'+days+' days');
-      self.showPricingHistory();
+      self.showPricingHistory().catch(self.error);
     });
-    var tabs = document.getElementsByClassName('trader-table-tab');
-    for(var i=0;i<tabs.length;i++) {
-      tabs[i].addEventListener('click',function(e) {
+    let tabs = document.getElementsByClassName('trader-table-tab');
+    for(let i=0;i<tabs.length;i++) {
+      tabs[i].addEventListener('click',function() {
         this.parentElement.setAttribute('selected-tab',this.getAttribute('selected-tab'));
       });
     }
     document.getElementById('trader-overlay-items').addEventListener('click',function(e) {
-      var model_id;
+      let model_id;
       e.path = e.path || e.composedPath();
-      for(var i=0;i<e.path.length && !model_id;i++) {
+      for(let i=0;i<e.path.length && !model_id;i++) {
         model_id = e.path[i].getAttribute('model_id');
       }
       if(model_id)
-        self.showPricingHistory(model_id);
+        self.showPricingHistory(model_id).catch(self.error);
     });
-    document.getElementById('delete_message_dismiss').addEventListener('click',function(e) {
+    document.getElementById('delete_message_dismiss').addEventListener('click',function() {
       document.getElementById('delete_message_modal').style.display = 'none'
     });
     document.getElementById('home-link').addEventListener('click',function(e) {
@@ -391,31 +398,31 @@ var KamadanClient = {
       self.hidePricingHistory();
     });
     this.loadMessages();
-    window.addEventListener("beforeunload", function(event) {
-      self.saveMessages(true);
+    window.addEventListener("beforeunload", function() {
+      self.saveMessages(true).catch(self.error);
     });
-    window.addEventListener('scroll', function(e) {
-      if(self.current_display != 'search' || !self.search_results.length || self.searching)
+    window.addEventListener('scroll', function() {
+      if(self.current_display !== 'search' || !self.search_results.length || self.searching)
         return;
-      
+
       if(window.scrollY + window.innerHeight > self.footer.offsetTop) {
         self.loadMore();
       }
     });
     document.getElementById('search-form').addEventListener('submit', function(e) {
       e.preventDefault();
-      self.search();
+      self.search().catch(self.error);
     });
     setInterval(function() {
       self.timestamps();
     },1000);
     document.getElementById('current-wrapper').addEventListener('click',function(e){
-      if(e.target && e.target.className == 'name') {
+      if(e.target && e.target.className === 'name') {
         if(e.ctrlKey) {
-          self.search('user:'+e.target.textContent);
+          self.search('user:'+e.target.textContent).catch(self.error);
         } else {
           e.target.textContent.copyToClipboard();
-          self.notify("Sender <b>"+e.target.textContent+"</b> copied to clipboard! (Ctrl + Click to search by this user)","notify-success",5000); 
+          self.notify("Sender <b>"+e.target.textContent+"</b> copied to clipboard! (Ctrl + Click to search by this user)","notify-success",5000);
         }
       }
    });
@@ -425,20 +432,20 @@ var KamadanClient = {
     this.poll();
     this.redrawTraderQuotes();
     if(this.getSearchTerm().length)
-      this.search();
+      this.search().catch(this.error);
     if(window.trader_item) {
-      var item = GuildWars.getItem(window.trader_item);
+      let item = GuildWars.getItem(window.trader_item);
       if(item)
-        this.showPricingHistory(item.model_id);
+        this.showPricingHistory(item.model_id).catch(self.error);
     }
     else if(/showing-prices/.test(this.listings_div.className)) {
-      this.showPricingHistory();
+      this.showPricingHistory().catch(self.error);
     }
   },
   pollWebsocket:function() {
     if(!window.WebSocket)
       return;
-    var self=this;
+    let self=this;
     setTimeout(function() {
       self.pollWebsocket();
     },this.ws_interval);
@@ -452,10 +459,9 @@ var KamadanClient = {
           return;
       }
     }
-    var self=this;
     try {
       this.ws = new WebSocket(this.websocket_url);
-      this.ws.onopen = function(evt) {
+      this.ws.onopen = function() {
         self.log("Websocket opened");
         self.ws.send(JSON.stringify({"compression":"lz","send_prices":1}));
         console.log("Websocket message compression set to LZW, see https://pieroxy.net/blog/pages/lz-string/index.html for examples");
@@ -479,46 +485,46 @@ var KamadanClient = {
     this.current_wrapper.innerHTML = '';
   },
   redrawMessages:function() {
-    var html = '';
-    var to_add = [];
-    
-    if(this.last_display != this.current_display)
+    let html = '';
+    let to_add = [];
+
+    if(this.last_display !== this.current_display)
       this.clearMessages();
-    if(this.current_display != 'search') {
+    if(this.current_display !== 'search') {
       document.getElementById('search-info').innerHTML = '';
     }
-    var messages = this.current_display == 'search' ? this.search_results : this.messages;
-    
-    for(var i = 0;i < messages.length ;i++) {
+    let messages = this.current_display === 'search' ? this.search_results : this.messages;
+
+    for(let i = 0;i < messages.length ;i++) {
       if(document.getElementById(messages[i].t))
         continue;
       to_add.push(i);
     }
     if(to_add.length) {
-      for(var i = to_add.length - 1;i >= 0 ;i--) {
+      for(let i = to_add.length - 1;i >= 0 ;i--) {
         html = '<tr class="row unanimated" id="'+messages[to_add[i]].t+'">\
           <td class="info"><div class="name">'+messages[to_add[i]].s+'</div><div data-timestamp="'+messages[to_add[i]].t+'" class="age"></div></td>\
           <td class="message">'+messages[to_add[i]].m+'</td>\
           <td class="delete"></td>\
         </tr>' + html;
       }
-      
-      if(to_add[0] == 0) {
+
+      if(to_add[0] === 0) {
         this.current_wrapper.insertBefore(HTML2DocumentFragment(html),this.current_wrapper.firstChild);
       } else {
         this.current_wrapper.appendChild(HTML2DocumentFragment(html));
       }
       this.timestamps();
       this.animations();
-      this.checkAndNotify(to_add);
+      this.checkAndNotify(to_add).catch(this.error);
     }
     this.last_display = this.current_display;
     this.page_wrapper.className = 'display-'+this.current_display;
     this.table_wrapper.className = 'display-'+this.current_display;
   },
   redrawTraderQuotes:function() {
-    var abbrPrice = function(price,dp) {
-      var as_k = 0;
+    let abbrPrice = function(price,dp) {
+      let as_k = 0;
       if(price > 999) {
         as_k = 1;
         price /= 1000;
@@ -527,41 +533,41 @@ var KamadanClient = {
           dp = 0;
       return price.toFixed(dp)+(as_k ? "k" : "g");
     }
-    var abbrAmount = function(num,dp) {
+    let abbrAmount = function(num,dp) {
       if(num % 1 === 0)
           dp = 0;
       return num.toFixed(dp);
     }
-    var quotes = window.current_trader_quotes;
-    var html = '';
-    var overlay_html = '';
-    var latest_timestamp = 0;
-    for(var i in common_materials_sorted) {
-      var model_id = common_materials_sorted[i];
-      var mat = GuildWars.common_materials[model_id];
-      var icon = GuildWars.item_icons[model_id] || ''; // TODO: Placeholder
-      for(var quote_model_id in quotes.buy) {
-        if(quote_model_id != model_id) continue;
-        var q = quotes.buy[quote_model_id];
-        var name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
-        var price_per = q.p / (mat.per ? mat.per : 1);
+    let quotes = window.current_trader_quotes;
+    let html = '';
+    let overlay_html = '';
+    let latest_timestamp = 0;
+    for(let i in common_materials_sorted) {
+      let model_id = common_materials_sorted[i];
+      let mat = GuildWars.common_materials[model_id];
+      let icon = GuildWars.item_icons[model_id] || '';
+      for(let quote_model_id in quotes.buy) {
+        if(quote_model_id !== model_id) continue;
+        let q = quotes.buy[quote_model_id];
+        let name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
+        let price_per = q.p / (mat.per ? mat.per : 1);
         latest_timestamp = Math.max(latest_timestamp,q.t);
-        overlay_html += "<tr class='common-material-row' model_id='"+model_id+"'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+abbrPrice(q.p)+" (100k = "+abbrAmount(100000 / price_per,2)+")</td></tr>";
+        overlay_html += "<tr class='common-material-row' data-model-id='"+model_id+"'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+abbrPrice(q.p)+" (100k = "+abbrAmount(100000 / price_per,2)+")</td></tr>";
         if(price_quote_summary_items[model_id]) {
           html += "<div class='trader-price' style='background-image:url("+icon+");'>"+abbrPrice(q.p)+"</div>";
         }
       }
     }
-    for(var i in rare_materials_sorted) {
-      var model_id = rare_materials_sorted[i];
-      var mat = GuildWars.rare_materials[model_id];
-      var icon = GuildWars.item_icons[model_id] || ''; // TODO: Placeholder
-      for(var quote_model_id in quotes.buy) {
-        if(quote_model_id != model_id) continue;
-        var q = quotes.buy[quote_model_id];
-        var name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
+    for(let i in rare_materials_sorted) {
+      let model_id = rare_materials_sorted[i];
+      let mat = GuildWars.rare_materials[model_id];
+      let icon = GuildWars.item_icons[model_id] || '';
+      for(let quote_model_id in quotes.buy) {
+        if(quote_model_id !== model_id) continue;
+        let q = quotes.buy[quote_model_id];
+        let name = (mat.per && mat.per > 1 ? mat.per+' x ' : '')+mat.name;
         latest_timestamp = Math.max(latest_timestamp,q.t);
-        overlay_html += "<tr class='rare-material-row' model_id='"+model_id+"'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+" (100k = "+(100000 / q.p).toFixed(2)+")</td></tr>";
+        overlay_html += "<tr class='rare-material-row' data-model-id='"+model_id+"'><td class='trader-mat-name' style='background-image:url("+icon+");'>"+name+"</td><td class='trader-mat-price'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+" (100k = "+(100000 / q.p).toFixed(2)+")</td></tr>";
         if(price_quote_summary_items[model_id]) {
           html += "<div class='trader-price' style='background-image:url("+icon+");'>"+(q.p > 1000 ? (q.p/1000).toFixed(1)+"k" : q.p+"g")+"</div>";
         }
@@ -569,33 +575,32 @@ var KamadanClient = {
     }
     console.log(latest_timestamp);
     window.current_trader_quotes.updated_at = window.current_trader_quotes.updated_at || Date.now();
-    document.getElementById('trader-item-ts').setAttribute('data-timestamp',latest_timestamp*1000);
+    document.getElementById('trader-item-ts').setAttribute('data-timestamp',(latest_timestamp*1000).toString());
     document.getElementById('trader-summary').innerHTML = html;
     document.getElementById('trader-overlay-items').innerHTML = overlay_html;
   },
   timestamps:function() {
     if(!this.isVisible())
       return;
-    var rows = document.querySelectorAll('.age');
+    let rows = document.querySelectorAll('.age');
     try {
-      for(var i=0;i<rows.length;i++) {
-        var ts = (new Date(parseInt(rows[i].getAttribute('data-timestamp')))).relativeTime();
-        if(rows[i].innerHTML != ts)
+      for(let i=0;i<rows.length;i++) {
+        let ts = (new Date(parseInt(rows[i].getAttribute('data-timestamp')))).relativeTime();
+        if(rows[i].innerHTML !== ts)
           rows[i].innerHTML = ts;
       }
     } catch(e) {}
   },
   checkAndNotify:function(new_messages) {
     // Cycles through these messages, if a match for notification is found, do it
-    if(!window.Notification || window.Notification.permission == 'denied' || window.location.protocol != 'https:')
+    if(!window.Notification || window.Notification.permission === 'denied' || window.location.protocol !== 'https:')
       return;
-    var self = this;
-    
-    var notification;
-    for(var i=0;i<new_messages.length && !notification;i++) {
-      for(var j in this.message_alert_checks) {
-        var match = true;
-        for(var k in this.message_alert_checks[j]) {
+
+    let notification;
+    for(let i=0;i<new_messages.length && !notification;i++) {
+      for(let j in this.message_alert_checks) {
+        let match = true;
+        for(let k in this.message_alert_checks[j]) {
           if(notification || !match) break;
           if(new_messages[i].indexOf(this.message_alert_checks[j]) < 0)
             match = false;
@@ -607,59 +612,56 @@ var KamadanClient = {
           body:new_messages[i].s+': '+new_messages[i].m
         };
         if(getFavicon())
-          n.icon = getFavicon();
+          notification.icon = getFavicon();
       }
     }
     if(!notification)
       return; // Nothing to notify
-    if (Notification.permission != "granted") {
-      return Notification.requestPermission().then(function (permission) {
+    if (Notification.permission !== "granted") {
+      return Notification.requestPermission().then(function () {
         new Notification(notification.title,{body:notification.body,icon:notification.icon});
       });
     }
   },
-  addMessageNotification:function(str) {
-    this.message_alert_checks[str] = str.split(' ');
-  },
   animations:function() {
-    var rows = document.querySelectorAll('.unanimated');
-    for(var i=0;i<rows.length;i++) {
+    let rows = document.querySelectorAll('.unanimated');
+    for(let i=0;i<rows.length;i++) {
       rows[i].classList.add('animate-fade-in');
       rows[i].classList.remove('unanimated');
     }
     setTimeout(function() {
-      var rows = document.querySelectorAll('.animate-fade-in');
-      for(var i=0;i<rows.length;i++) {
+      let rows = document.querySelectorAll('.animate-fade-in');
+      for(let i=0;i<rows.length;i++) {
         rows[i].classList.remove('animate-fade-in');
       }
     },500);
   },
   removeMessages:function(timestamps) {
-    var timestamp;
-    for(var j=0;j<timestamps.length;j++) {
+    let timestamp;
+    for(let j=0;j<timestamps.length;j++) {
       timestamp = timestamps[j];
-      for(var i=0;i<this.messages.length;i++) {
-        if(this.messages[i].t == timestamp) {
+      for(let i=0;i<this.messages.length;i++) {
+        if(this.messages[i].t === timestamp) {
           this.messages.splice(i,1);
           break;
         }
       }
-      for(var i=0;i<this.search_results.length;i++) {
-        if(this.search_results[i].t == timestamp) {
+      for(let i=0;i<this.search_results.length;i++) {
+        if(this.search_results[i].t === timestamp) {
           this.search_results.splice(i,1);
           break;
         }
       }
-      var element = document.getElementById(timestamp);
+      let element = document.getElementById(timestamp);
       if(element)
         element.parentNode.removeChild(element);
     }
   },
   parseMessages:function(json, check_against_search) {
     this.messages = this.messages || [];
-    var has_new = false;
-    var remove_messages = [];
-    for(var i=json.length-1; i >= 0;i--) {
+    let has_new = false;
+    let remove_messages = [];
+    for(let i=json.length-1; i >= 0;i--) {
       if(json[i].r) {
         remove_messages.push(json[i].r);
         delete json[i].r;
@@ -673,35 +675,32 @@ var KamadanClient = {
     }
     // Add to existing search results.
     if(check_against_search && !this.searching && this.last_search_term.length) {
-      var term = this.last_search_term;
-      var search_words = [];
-      var checkSender = function(msg) {
-        return msg.s.toLowerCase() == term;
+      let term = this.last_search_term;
+      let search_words = [];
+      let checkSender = function(msg) {
+        return msg.s.toLowerCase() === term;
       };
-      var checkMessage = function(msg) {
-        var toLower = msg.m.toLowerCase();
-        for(var i=0;i<search_words.length;i++) {
-          switch(search_words[i][0]) {
-            case '!':
-              if(toLower.indexOf(search_words[i].substr(1)) != -1)
-                return false; // Matched excluded word
-            break;
-          }
-          if(toLower.indexOf(search_words[i]) == -1)
-            return false;
+      let checkMessage = function(msg) {
+        let msg_words = msg.m.split(' ').map((word) => {
+          return word.replace(/\s$/g,'').trim();
+        });
+        for(let i=0;i<search_words.length;i++) {
+          if(msg_words.includes(search_words[i]))
+            return true;
         }
-        return true;
+        return false;
       };
-      var func;
-      if(term.indexOf('user:') == 0) {
+
+      let func;
+      if(term.indexOf('user:') === 0) {
         term = term.substring(5).toLowerCase();
-        func = checkUser;
+        func = checkSender;
       } else {
-        search_words = term.split(' ');
+        search_words = term.toLowerCase().split(' ');
         func = checkMessage;
       }
-      var hits = [];
-      for(var i=json.length-1; i >= 0;i--) {
+      let hits = [];
+      for(let i=json.length-1; i >= 0;i--) {
         if(func(json[i]))
           hits.unshift(json[i]);
       }
@@ -710,10 +709,10 @@ var KamadanClient = {
     }
     if(has_new) {
       this.redrawMessages();
-      this.saveMessages(); 
+      this.saveMessages().catch(this.error);
     }
   },
-  showPricingHistory:function(model_id, from, to) {
+  showPricingHistory:async function(model_id, from, to) {
     this.listings_div.classList.add('showing-prices');
     if(model_id)
       this.pricing_history.model_id = model_id;
@@ -721,135 +720,131 @@ var KamadanClient = {
       this.pricing_history.from = from;
     if(to)
       this.pricing_history.to = to;
-    var self = this;
-    this.getPricingHistory().then(function(data) {
-      if(self.pricing_history.to.getTime() != self.pricing_history.to_original.getTime())
-        self.listings_div.classList.add('graph-panned');
-      else
-        self.listings_div.classList.remove('graph-panned');
-      if(self.pricing_history.to.getTime() >= self.pricing_history.to_original.getTime())
-        self.listings_div.classList.add('graph-today');
-      else
-        self.listings_div.classList.remove('graph-today');
-      var dataPoints = {};
-      var bgCol = 'rgba(252, 247, 200,0.3)';
-      var dragCol = 'rgba(108,82,34,0.5)';
-      var dragLine = '#3c2d11';
-      var lineCol = '#d1c190';
-      for(var i=0;i<data.length;i++) {
-        dataPoints[data[i].m] = dataPoints[data[i].m] || {
-          lineTension:0,
-          type:"line",
-          steppedLine:"after",
-          label:GuildWars.getItemName(data[i].m),
-          fillColor: bgCol, 
-          backgroundColor:bgCol,
-          highlightFill: bgCol,
-          strokeColor:lineCol,
-          borderColor:lineCol,
-          highlightStroke: lineCol,
-          pointHitRadius:5,
-          data:[]
-        };
-        dataPoints[data[i].m].data.push({x:data[i].t,y:data[i].p});
-      }
-      var dataSets = [];
-      var suggestedMax = Math.floor(self.pricing_history.to.getTime() / 1000);
-      var suggestedMin = Math.floor(self.pricing_history.from.getTime() / 1000);
-      for(var i in dataPoints) {
-        if(dataPoints[i].data[0].x < suggestedMax)
-          dataPoints[i].data.unshift({x:suggestedMax,y:dataPoints[i].data[0].y});
-        if(dataPoints[i].data[dataPoints[i].data.length - 1].x > suggestedMin)
-          dataPoints[i].data.push({x:suggestedMin,y:dataPoints[i].data[dataPoints[i].data.length - 1].y});
-        dataPoints[i].dataPoints = dataPoints[i].data;
-        dataSets.push(dataPoints[i]);
-      }
-      var chart_args = {
-        type:'line',
-        data:{
-          datasets:dataSets
-        },
-        options: {
-          responsive:true,
-          maintainAspectRatio:false,
-          tooltips: {
-            callbacks: {
-              title:function(tooltipItem,data) {
-                return (new Date(tooltipItem[0].xLabel * 1000)).niceDateTime();
-              },
-              label:function(tooltipItem,data) {
-                return data.datasets[tooltipItem.datasetIndex].label+': '+tooltipItem.yLabel+'g';
-              },
-              afterLabel:function(tooltipItem,data) {
-                if(tooltipItem.index == data.datasets[tooltipItem.datasetIndex].data.length - 1)
-                  return '';
-                var prev = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index+1];
-                if(prev.y == tooltipItem.yLabel)
-                  return '';
-                var prevTime = new Date(prev.x * 1000);
-                var thisTime = new Date(tooltipItem.xLabel * 1000);
-                var diff = thisTime.diff(prevTime);
-                var unit = diff.bestFitUnit();
-                var val = diff[unit+'s']();
-                return "Was "+prev.y+"g for "+val+" "+unit+(val > 1 ? 's' : '');
-              }
+    let self = this;
+    let data = await this.getPricingHistory();
+    if(self.pricing_history.to.getTime() !== self.pricing_history.to_original.getTime())
+      self.listings_div.classList.add('graph-panned');
+    else
+      self.listings_div.classList.remove('graph-panned');
+    if(self.pricing_history.to.getTime() >= self.pricing_history.to_original.getTime())
+      self.listings_div.classList.add('graph-today');
+    else
+      self.listings_div.classList.remove('graph-today');
+    let dataPoints = {};
+    let bgCol = 'rgba(252, 247, 200,0.3)';
+    let dragCol = 'rgba(108,82,34,0.5)';
+    let dragLine = '#3c2d11';
+    let lineCol = '#d1c190';
+    for(let i=0;i<data.length;i++) {
+      dataPoints[data[i].m] = dataPoints[data[i].m] || {
+        lineTension:0,
+        type:"line",
+        steppedLine:"after",
+        label:GuildWars.getItemName(data[i].m),
+        fillColor: bgCol,
+        backgroundColor:bgCol,
+        highlightFill: bgCol,
+        strokeColor:lineCol,
+        borderColor:lineCol,
+        highlightStroke: lineCol,
+        pointHitRadius:5,
+        data:[]
+      };
+      dataPoints[data[i].m].data.push({x:data[i].t,y:data[i].p});
+    }
+    let dataSets = [];
+    let suggestedMax = Math.floor(self.pricing_history.to.getTime() / 1000);
+    let suggestedMin = Math.floor(self.pricing_history.from.getTime() / 1000);
+    for(let i in dataPoints) {
+      if(dataPoints[i].data[0].x < suggestedMax)
+        dataPoints[i].data.unshift({x:suggestedMax,y:dataPoints[i].data[0].y});
+      if(dataPoints[i].data[dataPoints[i].data.length - 1].x > suggestedMin)
+        dataPoints[i].data.push({x:suggestedMin,y:dataPoints[i].data[dataPoints[i].data.length - 1].y});
+      dataPoints[i].dataPoints = dataPoints[i].data;
+      dataSets.push(dataPoints[i]);
+    }
+    let chart_args = {
+      type:'line',
+      data:{
+        datasets:dataSets
+      },
+      options: {
+        responsive:true,
+        maintainAspectRatio:false,
+        tooltips: {
+          callbacks: {
+            title:function(tooltipItem) {
+              return (new Date(tooltipItem[0].xLabel * 1000)).niceDateTime();
+            },
+            label:function(tooltipItem,data) {
+              return data.datasets[tooltipItem.datasetIndex].label+': '+tooltipItem.yLabel+'g';
+            },
+            afterLabel:function(tooltipItem,data) {
+              if(tooltipItem.index === data.datasets[tooltipItem.datasetIndex].data.length - 1)
+                return '';
+              let prev = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index+1];
+              if(prev.y === tooltipItem.yLabel)
+                return '';
+              let prevTime = new Date(prev.x * 1000);
+              let thisTime = new Date(tooltipItem.xLabel * 1000);
+              let diff = thisTime.diff(prevTime);
+              let unit = diff.bestFitUnit();
+              let val = diff[unit+'s']();
+              return "Was "+prev.y+"g for "+val+" "+unit+(val > 1 ? 's' : '');
             }
-          },
-          scales: {
-              xAxes: [{
-                type: 'linear',
-                position: 'bottom',
-                ticks: {
-                  callback: function(value, index, values) {
-                    return (new Date(value * 1000)).format('So MMM');
-                  },
-                  max:suggestedMax,
-                  min:suggestedMin,
-                  stepSize:Date.hour * 24 / 1000
-                }
-              }],
-             yAxes: [{
-                ticks: {
-                    suggestedMin:50,
-                    stepSize:500
-                }
-            }]
-          },
-          plugins: {
+          }
+        },
+        scales: {
+          xAxes: [{
+            type: 'linear',
+            position: 'bottom',
+            ticks: {
+              callback: function(value) {
+                return (new Date(value * 1000)).format('So MMM');
+              },
+              max:suggestedMax,
+              min:suggestedMin,
+              stepSize:Date.hour * 24 / 1000
+            }
+          }],
+          yAxes: [{
+            ticks: {
+              suggestedMin:50,
+              stepSize:500
+            }
+          }]
+        },
+        plugins: {
+          zoom: {
+            pan: {enabled: false},
             zoom: {
-              pan: {enabled: false},
-              zoom: {
-                enabled: true,
-                mode: 'x',
-                drag: {
-                  borderColor: dragLine,
-                  borderWidth: 1,
-                  backgroundColor: dragCol,
-                  animationDuration: 3
-                },
-                onZoomComplete: function() {
-                  self.listings_div.classList.add('graph-zoomed');
-                }
+              enabled: true,
+              mode: 'x',
+              drag: {
+                borderColor: dragLine,
+                borderWidth: 1,
+                backgroundColor: dragCol,
+                animationDuration: 3
+              },
+              onZoomComplete: function() {
+                self.listings_div.classList.add('graph-zoomed');
               }
             }
           }
         }
-      };
-      var canvas = document.getElementById('prices-graph-canvas');
-      canvas.height = canvas.parentElement.offsetHeight;
-      canvas.width = canvas.parentElement.offsetWidth;
-      if(self.pricing_history.chart) {
-        for(var i in chart_args) {
-          self.pricing_history.chart[i] = chart_args[i];
-        }
-        self.pricing_history.chart.update();
-      } else {
-        self.pricing_history.chart = new Chart('prices-graph-canvas', chart_args);
       }
-    }).catch(function(e) {
-      self.error(e);
-      self.hidePricingHistory();
-    });
+    };
+    let canvas = document.getElementById('prices-graph-canvas');
+    canvas.height = canvas.parentElement.offsetHeight;
+    canvas.width = canvas.parentElement.offsetWidth;
+    if(self.pricing_history.chart) {
+      for(let i in chart_args) {
+        self.pricing_history.chart[i] = chart_args[i];
+      }
+      self.pricing_history.chart.update();
+    } else {
+      self.pricing_history.chart = new Chart('prices-graph-canvas', chart_args);
+    }
   },
   hidePricingHistory:function() {
     this.listings_div.classList.remove('showing-prices');
@@ -858,7 +853,10 @@ var KamadanClient = {
     this.pricing_history.from = this.pricing_history.from_original.clone();
     this.pricing_history.to = this.pricing_history.to_original.clone();
     this.listings_div.classList.remove('graph-panned');
-    this.showPricingHistory();
+    this.showPricingHistory().catch((e) => {
+      this.error(e);
+      this.hidePricingHistory();
+    });
   },
   resetZoom:function() {
     if(this.pricing_history.chart)
@@ -866,16 +864,16 @@ var KamadanClient = {
     this.listings_div.classList.remove('graph-zoomed');
   },
   getPricingHistory:function() {
-    var self = this;
+    let self = this;
     if(!self.pricing_history.model_id)
       return Promise.reject(new Error("Invalid model_id"));
     self.resetZoom();
     return new Promise(function(resolve,reject) {
-      var req = new XMLHttpRequest();
+      let req = new XMLHttpRequest();
       req.addEventListener("load", function() {
         if(!this.response.length)
           return resolve([]);
-        var result = null;
+        let result = null;
         try {
           result = JSON.parse(this.response);
         } catch(e) {
@@ -893,8 +891,7 @@ var KamadanClient = {
   },
   onWebsocketMessage:function(evt) {
     this.setPollInterval(30000);
-    var message = evt.data;
-    var self=this;
+    let message = evt.data;
     try {
       //console.log("Decompressing",message);
       message = LZString.decompressFromUTF16(message);
@@ -903,7 +900,7 @@ var KamadanClient = {
       return;
     }
     try {
-      var data = JSON.parse(message);
+      let data = JSON.parse(message);
       if(data && data.t && data.m && data.s)
         this.parseMessages([data], true);
       else if(data && data.r)
@@ -911,12 +908,12 @@ var KamadanClient = {
       if(data && (data.buy || data.sell)) {
         console.log("Trader prices received",data);
         if(data.buy) {
-          for(var i in data.buy) {
+          for(let i in data.buy) {
             window.current_trader_quotes.buy[i] = data.buy[i];
           }
         }
         if(data.sell) {
-          for(var i in data.sell) {
+          for(let i in data.sell) {
             window.current_trader_quotes.sell[i] = data.sell[i];
           }
         }
@@ -925,47 +922,45 @@ var KamadanClient = {
       }
     }
     catch(e) {
-      this.error(e);        
+      this.error(e);
     }
   },
   loadMessages:function() {
-    if(!window.localStorage) 
+    if(!window.localStorage)
       return;
-    
+
     this.messages = [];
     try {
-      if(window.localStorage.getItem('deployment_date') != window.deployment_date)
+      if(window.localStorage.getItem('deployment_date') !== window.deployment_date)
         return; // - Deployment change since this was saved
       this.messages = JSON.parse(window.localStorage.getItem('messages'))
-    } catch(e) {    };
+    } catch(e) {    }
     if(!this.messages || !this.messages.length)
       return;
     this.redrawMessages();
   },
-  saveMessages:function(force) {
+  saveMessages:async function(force) {
     if(!window.localStorage) return;
     if(this.pendingSave && !force) return;
-    var self=this;
-    var doSave = function() {
-      window.localStorage.setItem('deployment_date',window.deployment_date);
-      window.localStorage.setItem('messages',JSON.stringify(self.messages));
-      self.pendingSave = null;
-    };
-    if(force)
-      doSave();
-    this.pendingSave = setTimeout(doSave,5000);
+    this.pendingSave = true;
+    if(!force) {
+      await sleep(5000);
+    }
+    window.localStorage.setItem('deployment_date',window.deployment_date);
+    window.localStorage.setItem('messages',JSON.stringify(this.messages));
+    this.pendingSave = false;
   },
   parseSearchResults:function(json, already_html_encoded) {
     if(json.length) {
-      var push_or_unshift = this.search_results.length && this.search_results[0].t > json[0].t ? 'push' : 'unshift';
-      if(push_or_unshift == 'unshift') {
-        for(var i=json.length - 1; i >= 0;i--) {
+      let push_or_unshift = this.search_results.length && this.search_results[0].t > json[0].t ? 'push' : 'unshift';
+      if(push_or_unshift === 'unshift') {
+        for(let i=json.length - 1; i >= 0;i--) {
           if(!already_html_encoded)
             json[i].m = json[i].m.encodeHTML();
           this.search_results.unshift(json[i]);
         }
       } else {
-        for(var i=0; i < json.length;i++) {
+        for(let i=0; i < json.length;i++) {
           if(!already_html_encoded)
             json[i].m = json[i].m.encodeHTML();
           this.search_results.push(json[i]);
@@ -977,12 +972,12 @@ var KamadanClient = {
       this.last_searched_offset = this.search_results[this.search_results.length - 1].t;
     }
     this.redrawMessages();
-    if(this.current_display == 'search')
+    if(this.current_display === 'search')
       document.getElementById('search-info').innerHTML = "Showing "+this.search_results.length+" results for <i>"+this.last_search_term+"</i>";
   },
   poll:function(force) {
-    var self = this;
-    if(!force && self.ws && self.ws.readyState != WebSocket.CLOSED)
+    let self = this;
+    if(!force && self.ws && self.ws.readyState !== WebSocket.CLOSED)
         return;
     if(!this.isVisible())
       return this.disconnect();
@@ -997,18 +992,18 @@ var KamadanClient = {
       },self.poll_interval);
       self.log("Poll queued");
     }
-    var req = new XMLHttpRequest();
+    let req = new XMLHttpRequest();
     req.addEventListener("load", function() {
       if(!this.response.length)
         return requeue();
-      var result;
+      let result;
       try {
         result = JSON.parse(this.response);
       } catch(e) {
         self.error(e);
         return requeue();
       }
-      if (!self.ws || self.ws.readyState != WebSocket.OPEN)
+      if (!self.ws || self.ws.readyState !== WebSocket.OPEN)
         self.setPollInterval(3000);
       self.parseMessages(result);
       requeue();
@@ -1023,7 +1018,7 @@ var KamadanClient = {
   },
   onNotifyClose:function(){},
   notify:function(message,type,dismissable) {
-    var notification_popup = document.getElementById('notify_popup');
+    let notification_popup = document.getElementById('notify_popup');
     if(!message) {
       notification_popup.className = '';
       setTimeout(function() {
@@ -1036,11 +1031,11 @@ var KamadanClient = {
     setTimeout(function() {
       notification_popup.className = 'notifying '+type;
     },100);
-    var self = this;
+    let self = this;
     self.onNotifyClose = function() { self.notify(false); };
     if(typeof dismissable == 'boolean') {
       self.onNotifyClose = dismissable ? function() { self.notify(false); } : function(){};
-    } else if(parseInt(dismissable) != NaN) {
+    } else if(!isNaN(parseInt(dismissable))) {
       if(self.dismissTimeout)
         clearTimeout(self.dismissTimeout);
       self.dismissTimeout = setTimeout(function() {
@@ -1050,17 +1045,28 @@ var KamadanClient = {
   }
 };
 //KamadanClient.notify("Message @ "+Date.now(),'notify-success',5000);
-var favicon;
+let favicon = null;
 function getFavicon(){
   if(favicon)
     return favicon;
-  var nodeList = document.getElementsByTagName("link");
-  for (var i = 0; !favicon && i < nodeList.length; i++) {
-    if((nodeList[i].getAttribute("rel") == "icon")||(nodeList[i].getAttribute("rel") == "shortcut icon"))
-      favicon = nodeList[i].getAttribute("href");
+  const link_elements = document.querySelectorAll("link");
+  for(let i=0;i<link_elements.length;i++) {
+    switch(link_elements[i].getAttribute("rel") || "") {
+      case "icon":
+      case "shortcut icon":
+        favicon = link_elements[i].getAttribute("href");
+        return favicon;
+    }
   }
-  return favicon;        
+  return favicon;
 }
+
+/**
+ *
+ * @param markup {string}
+ * @returns {Node}
+ * @constructor
+ */
 function HTML2DocumentFragment(markup) {
   if (markup.toLowerCase().trim().indexOf('<!doctype') === 0) {
       let doc = document.implementation.createHTMLDocument("");
@@ -1073,7 +1079,7 @@ function HTML2DocumentFragment(markup) {
       return el.content;
   } else {
       // Template tag doesn't exist!
-      var docfrag = document.createDocumentFragment();
+      let docfrag = document.createDocumentFragment();
       let el = document.createElement('body');
       el.innerHTML = markup;
       for (let i = 0; 0 < el.childNodes.length;) {
