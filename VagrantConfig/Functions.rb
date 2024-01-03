@@ -39,7 +39,7 @@ def install_plugin(plugin_name,plugin_details)
 	plugin_details = {'version'=>nil} if !plugin_details
 	has_plugin = Vagrant.has_plugin?(plugin_name)
 	has_plugin_version = Vagrant.has_plugin?(plugin_name,plugin_details['version'])
-	
+
 	if has_plugin && !has_plugin_version
 		# Bespoke version given; check for compatibility. If it isn't the right version, uninstall and drop through to install
 		puts "#{plugin_name} is present, but is an invalid version."
@@ -65,9 +65,6 @@ def install_plugin(plugin_name,plugin_details)
 	end
 	return 0
 end
-def assert_provider(provider_name)
-
-end
 def uninstall_plugin(plugin_name)
 	return 0 unless Vagrant.has_plugin?(plugin_name)
 	run_command("vagrant plugin uninstall #{plugin_name}")
@@ -81,40 +78,6 @@ def enforce_machine_name_requirement()
 			exit
 		end
 	end
-end
-def get_provider_from_command()
-
-end
-def chef_deployment(machine,machine_name,machine_properties)
-	chef_recipes =  machine_properties['chef_recipes'] || $Project['chef_recipes']
-	cookbooks_path =  machine_properties['cookbooks_path'] || $Project['cookbooks_path'] || "#{machine_properties['server_config']['repository_code_folder']}/cookbooks"
-	return false if !chef_recipes || !cookbooks_path
-
-	server_config_json = Marshal::load(Marshal.dump(machine_properties['server_config']))
-	server_config_json['hostname'] = machine.vm.hostname
-	server_config_json['run_list'] = []
-	Array(chef_recipes).join(' ').split(' ').each do |recipe|
-		server_config_json['run_list'].unshift("recipe[#{recipe}]")
-	end
-	
-	machine.vm.provision "shell" do |s|
-		s.name = "Chef deployment"
-		s.path = %Q(#{$config_folder}/chef_deploy.sh)
-		s.args = [
-			"#{machine_properties['server_config']['repository_code_folder']}/cookbooks",
-			JSON.generate(server_config_json)
-		]
-	end
-	return true
-	machine.vm.provision :chef_solo do |chef|
-		chef.json = machine_properties['server_config']
-		chef.log_level = :info
-		chef.cookbooks_path = Array(cookbooks_path)
-		Array(chef_recipes).each do |recipe|
-			chef.add_recipe recipe
-		end
-	end
-	return true
 end
 def shell_script_deployment(machine,machine_name,machine_properties)
 	deployment_script = machine_properties['deployment_script'] || $Project['deployment_script']
@@ -141,12 +104,12 @@ def shell_script_deployment(machine,machine_name,machine_properties)
 					sed -i "$ i\\/bin/bash $DEPLOYMENT_SCRIPT_LOCATION\\n" /tmp/rc_local_tmp;
 					sudo cp -ura /tmp/rc_local_tmp /etc/rc.local && rm /tmp/rc_local_tmp
 				);
-				/bin/bash /etc/rc.local	
+				/bin/bash /etc/rc.local
 			else
 				/bin/bash $DEPLOYMENT_SCRIPT_LOCATION
 			fi
 		EOC
-	end	
+	end
 end
 def install_rsync_on_server()
 	machine.vm.provision "shell_bash" do |s|
@@ -166,8 +129,15 @@ def get_machine_name_from_command()
 	end
 	return nil
 end
-def local_machine_setup(machine, machine_name, machine_properties)
+def virtualbox_machine_setup(machine, machine_name, machine_properties)
 	machine_properties['is_local'] = 1
+	machine_properties['is_virtualbox'] = 1
+	machine_properties['is_cloud'] = 0
+	machine_setup(machine, machine_name, machine_properties)
+end
+def docker_machine_setup(machine, machine_name, machine_properties)
+    machine_properties['is_local'] = 1
+	machine_properties['is_docker'] = 1
 	machine_properties['is_cloud'] = 0
 	machine_setup(machine, machine_name, machine_properties)
 end
@@ -180,17 +150,19 @@ def machine_setup(machine, machine_name, machine_properties)
 	$rsync_folder_excludes.each do |local_folder,server_folder|
 		machine.vm.synced_folder "#{local_folder}", "#{server_folder}", disabled: true
 	end
+	machine_properties['server_config']['is_docker'] = machine_properties['is_docker']
+	machine_properties['server_config']['is_virtualbox'] = machine_properties['is_virtualbox']
 	machine_properties['server_config']['is_local'] = machine_properties['is_local']
 	machine_properties['server_config']['is_cloud'] = machine_properties['is_cloud']
-	
-	
+
+
 	code_to_provision = machine_properties['code_to_provision'] || 'local'
 	branch = machine_properties['branch'] || 'master'	# If the machine definition has 'branch' attribute, pull from that branch.
 	command_machine_name = get_machine_name_from_command()
 	command_machine_action = get_action_from_command()
-	
+
 	return 0 if command_machine_name != machine_name
-		
+
 	if command_machine_name == machine_name		# Only run these runtime bits if we're actually running this server.
 		if machine_properties['is_local'] != 1 && machine_properties['prompt_user_before_provision'] != 0	# ...if this server is NOT a local server (i.e. external/cloud hosted)...
 			case command_machine_action	# ...display "Are you sure?" prompts to user when either deploying or destroying.
@@ -203,22 +175,17 @@ def machine_setup(machine, machine_name, machine_properties)
 	end
 	machine.ssh.insert_key = false
 	# Set local properties for VirtualBox
-	if machine_properties['is_local'] == 1
+	if machine_properties['is_virtualbox'] == 1 || machine_properties['is_docker'] == 1
 		if machine_properties['ip_address']
 			machine.vm.network 'private_network', ip: "#{machine_properties['ip_address']}"
 		end
-		machine.vm.hostname = machine_properties['hostnames'][0].split(",")[0]
-		if machine_properties['hostnames'].length > 1
-			machine_properties['hostnames'].shift
-		end
-		machine.hostsupdater.remove_on_suspend = true
 		machine.ssh.private_key_path = ["ssh/#{$Project['keypair_name']}", "~/.vagrant.d/insecure_private_key"]
 		machine.vm.provision "file", source: "ssh/#{$Project['keypair_name']}.pub", destination: "~/.ssh/authorized_keys"
 		machine.vm.provision "shell_bash" do |s|
 			s.name = "Disable SSH access via Password (use key only!)"
 			s.inline = <<-EOC
 				sudo sed -i -e "\\#PasswordAuthentication yes# s#PasswordAuthentication yes#PasswordAuthentication no#g" /etc/ssh/sshd_config
-				sudo service ssh restart
+				#sudo service ssh restart
 			EOC
 		end
 	end
@@ -228,18 +195,16 @@ def machine_setup(machine, machine_name, machine_properties)
 		#	p.run = {inline:%Q(sh "\"#{$config_folder}/VagrantConfig/install_rsync_on_server.sh\"" "#{machine_name}")}
 		#end
 		if machine_properties['is_local'] == 1
-			machine.vm.synced_folder '.',"#{machine_properties['server_config']['repository_code_folder']}",
-				mount_options: ["dmode=777,fmode=755"]
-			#machine.vm.synced_folder '.',"#{machine_properties['server_config']['repository_code_folder']}", type: 'rsync',
-			#	rsync__args: $rsync_args,
-			#	rsync__exclude: [".git/","VagrantConfig/","Vagrantfile","ssh/","server_config.json"],
-			#	rsync__auto: true,
-			#	mount_options: ["dmode=775,fmode=755"],
-			#	rsync__rsync_path: machine_properties['rsync_path'] || "sudo rsync"
+					machine.vm.synced_folder '.',"#{machine_properties['server_config']['repository_code_folder']}",
+                #type: "nfs",
+                nfs_udp:false,
+        		windows__nfs_options: ['nfsvers=3','rw', "dmode=777","fmode=755","uid=33","gid=33"],
+        				mount_options: ['rw', "dmode=777","fmode=755","uid=33","gid=33"],
+                linux__nfs_options: ['rw','no_subtree_check','all_squash','async']
 		else
 			machine.vm.synced_folder '.',"#{machine_properties['server_config']['repository_code_folder']}", type: 'rsync',
 				rsync__args: $rsync_args,
-				rsync__exclude: [".git/",".vs/",".idea/","VagrantConfig/","Vagrantfile","ssh/","ssl/","client/","server_config.json"],
+				rsync__exclude: [".git/",".vs/",".idea/","VagrantConfig/","node_modules/","server/node_modules/","vendor/","Vagrantfile","ssh/","ssl/","client/","server_config.json"],
 				rsync__auto: false,
 				mount_options: ["dmode=775,fmode=755"],
 				rsync__rsync_path: machine_properties['rsync_path'] || "rsync"
@@ -266,6 +231,6 @@ def machine_setup(machine, machine_name, machine_properties)
 		s.args = [ "#{machine_properties['server_config']['repository_code_folder']}/server_config.json", JSON.generate(server_config_json) ]
 		s.privileged = false
 	end
-	shell_script_deployment(machine, machine_name, machine_properties) unless chef_deployment(machine, machine_name, machine_properties)			# Deployment via Chef if 'chef_recipes' is provided in server_config.
+	shell_script_deployment(machine, machine_name, machine_properties)
 end
 

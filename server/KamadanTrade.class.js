@@ -444,7 +444,7 @@ KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
     let res = await this.db.query("SELECT m,t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",
         [message.s,trade_search_message,message.t - 2000]);
     if(res.length) {
-      existing_message_id = res[0].t;
+      existing_message_id = parseInt(res[0].t);
       console.log("Found party search version of this message; replace found message with this one.")
     }
   }
@@ -464,7 +464,7 @@ KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
     // Look for the same message from this user in the last 14 days...
     let res = await this.db.query("SELECT t FROM "+table+" WHERE s = ? AND m = ? AND t > ? ORDER BY t DESC LIMIT 1",[message.s,message.m,message.t - (864e5 * 14)]);
     if(res.length) {
-      existing_message_id = res[0].t;
+      existing_message_id = parseInt(res[0].t);
     }
   }
   if(existing_message_id) {

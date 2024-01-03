@@ -27,10 +27,14 @@ else
 fi
 printf "${RED}*** Connected ssh client is ${SSH_IP} ***${NC}\n";
 
+dpkg -s sudo 2>/dev/null >/dev/null || (
+  printf "${RED}*** Installing sudo ***${NC}\n";
+  apt-get install -y sudo);
+
 REQUIRED_PACKAGES='apt-transport-https build-essential curl chrony mariadb-server software-properties-common tesseract-ocr git ssh psmisc nano chrpath libssl-dev libxft-dev libfreetype6 libfontconfig1 certbot'
 
-sudo ln -sf /usr/share/zoneinfo/${SERVER_TIMEZONE} /etc/localtime; 
-export NODE_ENV=production; 
+sudo ln -sf /usr/share/zoneinfo/${SERVER_TIMEZONE} /etc/localtime;
+export NODE_ENV=production;
 
 # Required Packages process:
 # 1. Check to see if we're missing any of the packages listed in REQUIRED_PACKAGES string using dpkg -s command
@@ -38,32 +42,35 @@ export NODE_ENV=production;
 
 sudo dpkg -s ${REQUIRED_PACKAGES} 2>/dev/null >/dev/null || (
   printf "${RED}*** Installing missing packages via apt-get ***${NC}\n";
-  sudo apt-get install -y ${REQUIRED_PACKAGES});
-
-# Install npm
-npm -v | grep -q "[0-9]" || (sudo apt-get update && sudo apt install npm -y);
-# npm -v 2>/dev/null > /dev/null || (curl -L https://npmjs.org/install.sh | sudo sh);
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${REQUIRED_PACKAGES});
 
 # Install nodejs
 # 2021-02-17: MariaDB driver doesn't play nice with node 15
 # https://github.com/mariadb-corporation/mariadb-connector-nodejs/issues/132
-NODEJS_VERSION="14" 
+NODEJS_VERSION="18"
 node -v | grep -q "v${NODEJS_VERSION}" || (
-  # sudo apt-get remove nodejs -y;
-  sudo npm cache clean -f;
-  sudo npm install -g n;
-  sudo n ${NODEJS_VERSION};
+  sudo apt-get update;
+  sudo apt-get install -y ca-certificates curl gnupg;
+  sudo mkdir -p /etc/apt/keyrings;
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg;
+  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODEJS_VERSION.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list;
+
+  sudo apt-get update;
+  sudo apt-get install nodejs -y;
 );
 
 # On Ubuntu > 16.04, run chronyd -q to make sure the time is up-to-date
 #sudo chronyd -q
+
+sudo service mariadb start;
 
 [[ ! -z "${DB_USER}" ]]  && (
 	printf "${RED}*** Setting up database ***${NC}\n";
 	cmp -s "/etc/mysql/mariadb.conf.d/zz_project.cnf" "${PROJECT_CODE_FOLDER}/server/my.cnf" || (
 	  printf "${RED}*** Configuring mariadb database: copying over ${PROJECT_CODE_FOLDER}/server/my.cnf ***${NC}\n";
 	  sudo cp -ura "${PROJECT_CODE_FOLDER}/server/my.cnf" "/etc/mysql/mariadb.conf.d/zz_project.cnf";
-	  sudo service mysql restart);
+	  sudo chmod 755 "/etc/mysql/mariadb.conf.d/zz_project.cnf";
+	  sudo service mariadb restart);
 	# User management bits
 	sudo mysql -u root -e "DROP USER IF EXISTS '${DB_USER}'@'%';";
 	# Localhost
@@ -85,9 +92,9 @@ sudo npm install ./ --no-bin-links || exit 1;
 
 # Combine all of the above commands into a single string. touch /tmp/forever.log && forever start -a -l /tmp/forever.log -o /tmp/forever.log -e /tmp/forever.log server.js
 
-printf "${RED}*** ${PROJECT_CONTAINER}: Restarting server.js (forever stopall && forever start server.js) ***${NC}\n"; 
-sudo forever stop ${PROJECT_CODE_FOLDER}/server/server.js; 
-sudo touch /tmp/forever.log; 
+printf "${RED}*** ${PROJECT_CONTAINER}: Restarting server.js (forever stopall && forever start server.js) ***${NC}\n";
+sudo forever stop ${PROJECT_CODE_FOLDER}/server/server.js;
+sudo touch /tmp/forever.log;
 sudo chmod 777 /tmp/forever.log;
 sudo pkill -f kamadan-trade-client;
 sudo forever start -a -l /tmp/forever.log -s -c "node --expose-gc" ${PROJECT_CODE_FOLDER}/server/server.js

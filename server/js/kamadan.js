@@ -1,3 +1,17 @@
+class TradeMessage {
+  m='';
+  s='';
+  t=0;
+  constructor(json) {
+    if(typeof json == 'string') {
+      json = JSON.parse(json);
+    }
+    this.t = parseInt(json.t || '0');
+    this.s = json.s.toString();
+    this.m = json.m.toString();
+  }
+}
+
 async function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve,ms);
@@ -22,6 +36,43 @@ async function fetch(endpoint) {
     req.send();
   });
 }
+
+/**
+ *
+ * @param msg {string|string[]}
+ * @returns {string[]}
+ */
+let parseForSearching = function(msg) {
+  if(Array.isArray(msg))
+    return msg;
+  return msg.trim().toLowerCase().split(' ').map((word) => {
+    return word.replace(/\s$/g,'').trim();
+  }).filter((word) => {
+    return word.length > 0 && (word[0] !== '!' || word.length > 1);
+  });
+}
+/**
+ * @param msg {TradeMessage}
+ * @param term {string|[string]}
+ * @returns {boolean}
+ */
+let checkMessage = function(msg, term) {
+  let msg_words = parseForSearching(msg.m);
+  let search_words = parseForSearching(term);
+  if(!search_words.length)
+    return false;
+  for(let i=0;i<search_words.length;i++) {
+    if(search_words[i] === '!') {
+      if(msg_words.includes(search_words[i].slice(1)))
+        return false;
+    } else {
+      if(!msg_words.includes(search_words[i]))
+        return false;
+    }
+  }
+  return false;
+};
+
 
 window.GuildWars = {
   getItemName:function(model_id) {
@@ -212,7 +263,7 @@ window.KamadanClient = {
     scale:(36e5) / 1000 // Hourly
   },
   last_search_term:'',
-  message_alert_checks:{},
+  message_alert_checks:['wts'],
   current_display:'live',
   last_search_date:null,
   search_results:[],
@@ -378,13 +429,18 @@ window.KamadanClient = {
       });
     }
     document.getElementById('trader-overlay-items').addEventListener('click',function(e) {
-      let model_id;
-      e.path = e.path || e.composedPath();
-      for(let i=0;i<e.path.length && !model_id;i++) {
-        model_id = e.path[i].getAttribute('model_id');
+      let model_id = 0;
+      let target = e.target;
+      while(target && target !== e.currentTarget && !model_id) {
+        model_id = target.getAttribute('data-model-id');
+        target = target.parentElement;
       }
-      if(model_id)
-        self.showPricingHistory(model_id).catch(self.error);
+      if(!model_id)
+        return;
+      self.showPricingHistory(model_id).catch(self.error);
+      e.stopPropagation();
+      e.preventDefault();
+      return false;
     });
     document.getElementById('delete_message_dismiss').addEventListener('click',function() {
       document.getElementById('delete_message_modal').style.display = 'none'
@@ -591,25 +647,26 @@ window.KamadanClient = {
       }
     } catch(e) {}
   },
-  checkAndNotify:function(new_messages) {
+  checkAndNotify:async function(new_messages) {
     // Cycles through these messages, if a match for notification is found, do it
     if(!window.Notification || window.Notification.permission === 'denied' || window.location.protocol !== 'https:')
       return;
 
     let notification;
     for(let i=0;i<new_messages.length && !notification;i++) {
+      let message = this.messages[new_messages[i]];
       for(let j in this.message_alert_checks) {
         let match = true;
         for(let k in this.message_alert_checks[j]) {
           if(notification || !match) break;
-          if(new_messages[i].indexOf(this.message_alert_checks[j]) < 0)
+          if(message.m.indexOf(this.message_alert_checks[j]) < 0)
             match = false;
         }
         if(notification) break;
         if(!match) continue;
         notification = {
           title:"New trade message",
-          body:new_messages[i].s+': '+new_messages[i].m
+          body:message.s+': '+message.m
         };
         if(getFavicon())
           notification.icon = getFavicon();
@@ -618,9 +675,9 @@ window.KamadanClient = {
     if(!notification)
       return; // Nothing to notify
     if (Notification.permission !== "granted") {
-      return Notification.requestPermission().then(function () {
+      let granted = await Notification.requestPermission();
+      if(granted === 'granted')
         new Notification(notification.title,{body:notification.body,icon:notification.icon});
-      });
     }
   },
   animations:function() {
@@ -639,7 +696,7 @@ window.KamadanClient = {
   removeMessages:function(timestamps) {
     let timestamp;
     for(let j=0;j<timestamps.length;j++) {
-      timestamp = timestamps[j];
+      timestamp = parseInt(timestamps[j]);
       for(let i=0;i<this.messages.length;i++) {
         if(this.messages[i].t === timestamp) {
           this.messages.splice(i,1);
@@ -667,7 +724,7 @@ window.KamadanClient = {
         delete json[i].r;
       }
       json[i].m = json[i].m.encodeHTML();
-      has_new = this.messages.unshift(json[i]);
+      has_new = this.messages.unshift(new TradeMessage(json[i]));
     }
     this.removeMessages(remove_messages);
     while(this.messages.length > this.max_messages) {
@@ -680,16 +737,7 @@ window.KamadanClient = {
       let checkSender = function(msg) {
         return msg.s.toLowerCase() === term;
       };
-      let checkMessage = function(msg) {
-        let msg_words = msg.m.split(' ').map((word) => {
-          return word.replace(/\s$/g,'').trim();
-        });
-        for(let i=0;i<search_words.length;i++) {
-          if(msg_words.includes(search_words[i]))
-            return true;
-        }
-        return false;
-      };
+
 
       let func;
       if(term.indexOf('user:') === 0) {
@@ -957,13 +1005,13 @@ window.KamadanClient = {
         for(let i=json.length - 1; i >= 0;i--) {
           if(!already_html_encoded)
             json[i].m = json[i].m.encodeHTML();
-          this.search_results.unshift(json[i]);
+          this.search_results.unshift(new TradeMessage(json[i]));
         }
       } else {
         for(let i=0; i < json.length;i++) {
           if(!already_html_encoded)
             json[i].m = json[i].m.encodeHTML();
-          this.search_results.push(json[i]);
+          this.search_results.push(new TradeMessage(json[i]));
         }
       }
     }

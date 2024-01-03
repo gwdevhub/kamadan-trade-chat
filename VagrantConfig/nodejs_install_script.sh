@@ -60,7 +60,4 @@ function install_nodejs() {
 }
 
 
-4.8
-
-
 

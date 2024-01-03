@@ -1,10 +1,27 @@
 console.log("Initializing node server...");
 process.env.NODE_PATH = "../node_modules";
 require("module").Module._initPaths();
-var fs = fs || require('fs');
+let fs = require('fs');
 eval(fs.readFileSync(__dirname+'/server_modules.js')+'');
 
 BigInt.prototype.toJSON = function() { return this.toString() }
+
+function to_number(obj) {
+  if(!obj)
+    return 0;
+  if(typeof obj === 'number')
+    return obj;
+  if(typeof obj === 'string') {
+    let parsed = parseInt(obj);
+    if(isNaN(parsed) || typeof parsed !== 'number')
+      throw new Error("Failed to parse string in to_number");
+    return parsed;
+  }
+  if(typeof obj === 'bigint')
+    return Number(obj).valueOf();
+  throw new Error("Failed to interpret object in to_number");
+}
+
 
 function stringify(obj) {
   return JSON.stringify(obj, (key, value) =>
@@ -13,40 +30,6 @@ function stringify(obj) {
           : value // return everything else unchanged
   );
 }
-
-// Used for various SSL handling
-global.ssl_info = {
-  enabled:false,
-  ssl_domains: {},
-  ssl_email: ServerConfig.get('ssl_email')
-};
-let ssl_domains = ServerConfig.get('ssl_domains') || [ServerConfig.get('ssl_domain')];
-for(let i in ssl_domains) {
-  if(!ssl_domains[i]) continue;
-  if(!global.ssl_info.ssl_email) {
-    console.error("No SSL email defined in server config (ssl_email).\nThis server won't be running in SSL.");
-    break;
-  }
-  global.ssl_info.ssl_domains[ssl_domains[i]] = { enabled:false }
-  try {
-    global.ssl_info.ssl_domains[ssl_domains[i]].key = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/privkey.pem','utf8');
-    global.ssl_info.ssl_domains[ssl_domains[i]].cert = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/fullchain.pem','utf8');
-    //global.ssl_info.ssl_domains[ssl_domains[i]].ca = fs.readFileSync('/etc/letsencrypt/live/'+ssl_domains[i]+'/chain.pem','utf8');
-    global.ssl_info.ssl_domains[ssl_domains[i]].secureContext = require('tls').createSecureContext({
-      key:  global.ssl_info.ssl_domains[ssl_domains[i]].key,
-      cert: global.ssl_info.ssl_domains[ssl_domains[i]].cert
-    });
-    global.ssl_info.ssl_domains[ssl_domains[i]].enabled = true;
-    global.ssl_info.key = global.ssl_info.key || global.ssl_info.ssl_domains[ssl_domains[i]].key;
-    global.ssl_info.cert = global.ssl_info.cert || global.ssl_info.ssl_domains[ssl_domains[i]].cert;
-    //global.ssl_info.key = global.ssl_info.ca || global.ssl_info.ssl_domains[ssl_domains[i]].ca;
-    global.ssl_info.enabled = true;
-  } catch(e) {
-    console.error("There was a problem getting SSL keys for "+ssl_domains[i]+".\nThis could be because the server is local.\nThis server won't be running in SSL.");
-    log_error(e);
-  }
-}
-//console.log(global.ssl_info);
 
 // Valid source IP Addresses that can submit new trade messages
 let whitelisted_sources = [
@@ -68,7 +51,7 @@ let render_cache = {};
 let compile_cache = {};
 
 Handlebars.registerHelper("relativeTime", function(t) {
-  return (new Date(t)).relativeTime();
+  return (new Date(to_number(t))).relativeTime();
 });
 Handlebars.registerHelper("toJson", function(t) {
   return stringify(t);
@@ -212,12 +195,6 @@ async function updateStats() {
     global.stats.most_connected_sockets = global.stats.connected_sockets;
     global.stats.most_connected_at = new Date();
   }
-  global.stats.ssl_enabled = global.ssl_info.enabled ? 1 : 0;
-  global.stats.ssl_domains = [];
-  for(let i in global.ssl_info.domains) {
-    if(!global.ssl_info.domains.enabled) continue;
-    global.stats.ssl_domains.push(i);
-  }
   global.stats.status = "active";
 
   try {
@@ -236,19 +213,6 @@ let KamadanTrade = new TradeModule();
 KamadanTrade.table_prefix = 'kamadan_';
 let AscalonTrade = new TradeModule();
 AscalonTrade.table_prefix = 'ascalon_';
-
-// Middleware
-function redirectSSL(request, response,next){
-   if(/stats/.test(request.url))
-    return next(); // Disabled for /stats endpoint.
-  if(!request.secure && global.ssl_info.ssl_domains[request.hostname] && global.ssl_info.ssl_domains[request.hostname].enabled){
-    console.log("redirected "+request.headers.host + request.url+" to https");
-    response.writeHead(301, { "Location": "https://" + request.headers.host + request.url });
-    response.end();
-    return;
-  }
-  next();
-}
 
 // Websocket functions
 function configureWebsocketServer(server) {
@@ -450,8 +414,7 @@ function configureWebServer(app) {
     app.use(compression({ filter: shouldCompress }))
 
   }
-  app.use(compression())
-  app.get(redirectSSL);
+  app.use(compression());
   app.use(bodyParser.text({limit: limit_bytes, extended: true, parameterLimit:50000}));
   app.use(bodyParser.json({limit: limit_bytes, extended: true, parameterLimit:50000}));
   app.use(bodyParser.urlencoded({limit: limit_bytes, extended: true, parameterLimit:50000}));
@@ -663,14 +626,12 @@ async function addWhisper(req,res) {
   let is_pre = isPreSearing(req);
   let Trader = is_pre ? AscalonTrade : KamadanTrade;
   await lock();
-    try {
+  try {
     let added_message = Trader.addWhisper(req,timestamp);
     if(added_message) {
       pushMessage(added_message,is_pre);
     }
-  } catch(e) {
-    console.error(e);
-  }
+  } catch(e) { console.error(e); }
   unlock();
 }
 async function getSearchJSON(req,res) {
@@ -678,25 +639,22 @@ async function getSearchJSON(req,res) {
   let rows = [];
   try {
      rows = await Trader.search(req.params.term,req.params.from,req.params.to);
-  } catch(e) {
-    console.error(e);
-  }
+  } catch(e) { console.error(e); }
   res.json(rows);
 }
 async function getSearchUserJSON(req,res) {
-  var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
-  var user = ((req.params.term || req.query.term)+'').replace(/^user:/,'');
+  let Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+  let user = ((req.params.term || req.query.term)+'').replace(/^user:/,'');
+  let rows = [];
+
   try {
-    let rows = await Trader.search('user:'+user,req.params.from,req.params.to);
-    res.json(rows);
-  } catch(e) {
-    console.error(e);
-    res.json([]);
-  }
+    rows = await Trader.search('user:'+user,req.params.from,req.params.to);
+  } catch(e) { console.error(e); }
+  res.json(rows);
 }
 function getMessagesJSON(req,res) {
-  var etag = req.header('if-none-match') || 'none';
-  var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+  let etag = req.header('if-none-match') || 'none';
+  let Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
   // 304 if no new messages
   if(!Trader.last_message)
     return res.status(304).end();
@@ -714,27 +672,27 @@ function getMessagesJSON(req,res) {
   return res.send(Trader.cached_message_log);
 }
 async function getStatsJSON(req,res) {
+  let stats = {"status":"error"};
   try {
-    let stats = await updateStats();
+    stats = await updateStats();
     if(isWhitelisted(req)) {
       stats.extended = {};
-      var extended = extendedStats();
-      for(var i in extended) {
+      let extended = extendedStats();
+      for(let i in extended) {
         stats.extended[i] = extended[i];
       }
     }
     res.json(stats);
-  } catch(e) {
-     res.json({"status":"error"});
-  }
+  } catch(e) { console.error(e); }
+  res.json(stats);
 }
 function getSitemap(req,res) {
-  var sitemap = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-  var urls = ['zkey','ecto','bds','conset','kuunavang','vizu'];
+  let sitemap = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+  let urls = ['zkey','ecto','bds','conset','kuunavang','vizu'];
   if(isPreSearing(req)) {
     urls = ['charr bag','charr kit','black dye','kuunavang','vizu'];
   }
-  for(var i in urls) {
+  for(let i in urls) {
     sitemap += '<url><loc>https://'+req.headers.host+'/search/'+encodeURIComponent(urls[i])+'</loc><changefreq>hourly</changefreq></url>';
   }
   sitemap += '</urlset>';
@@ -743,12 +701,11 @@ function getSitemap(req,res) {
 }
 function getTraderQuotesJSON(req,res) {
   res.json(global.config.current_trade_prices);
-};
-function getSearchHTML(req,res) {
-  var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
-  var ip = getIP(req);
-  var now = Date.now();
-  var gotRows = function(rows) {
+}
+async function getSearchHTML(req,res) {
+  let Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+  let ip = getIP(req);
+  let gotRows = function(rows) {
     res.send(renderFile(__dirname+'/index.html',{req:req,messages:rows,search_term:req.params.term}));
   }
   last_search_by_ip[ip] = last_search_by_ip[ip] || 0;
@@ -756,26 +713,25 @@ function getSearchHTML(req,res) {
     return gotRows([]); // 4 simultaneous searches per IP
   }
   last_search_by_ip[ip]++;
-  Trader.search(req.params.term,0,0).then(function(rows) {
-    delete last_search_by_ip[ip];
-    return gotRows(rows);
-  }).catch(function(e) {
-    delete last_search_by_ip[ip];
+  let rows = [];
+  try {
+    rows = await Trader.search(req.params.term,0,0);
+  } catch(e) {
     console.error(e);
-    res.send(renderFile(__dirname+'/index.html',{req:req,messages:[],search_term:req.params.term}));
-  });
+  }
+  delete last_search_by_ip[ip];
+  return gotRows(rows);
 }
 function getIndexHTML(req,res) {
   res.send(renderFile(__dirname+'/index.html',{req:req}));
 }
-function getPricingHistoryJSON(req,res) {
-  var Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
-  Trader.getPricingHistory(req.params.model_id,req.params.from,req.params.to).then(function(rows) {
-    res.json(rows);
-  }).catch(function(e) {
-    console.error(e);
-    res.json([]);
-  });
+async function getPricingHistoryJSON(req,res) {
+  let Trader = isPreSearing(req) ? AscalonTrade : KamadanTrade;
+  let rows = [];
+  try {
+    rows = await Trader.getPricingHistory(req.params.model_id,req.params.from,req.params.to);
+  } catch(e) { console.error(e); }
+  res.json(rows);
 }
 
 // Begin
@@ -792,38 +748,7 @@ function getPricingHistoryJSON(req,res) {
   AscalonTrade.cached_message_log = stringify(AscalonTrade.live_message_log);
 
   console.log("\n---------- Starting Web Server ----------\n");
-  var app = configureWebServer();
-  if(global.ssl_info.enabled) {
-    try {
-      if(https_server) {
-        https_server.close();
-        https_server = null;
-      }
-      var https_contexts = {};
-      https_server = https.createServer({
-        SNICallback:function(domain,cb) {
-          if(!global.ssl_info.ssl_domains[domain])
-            return cb("Invalid SSL domain");
-          return cb(null,global.ssl_info.ssl_domains[domain].secureContext);
-        },
-        key: global.ssl_info.key,
-        cert: global.ssl_info.cert
-      });
-      wss_server = configureWebsocketServer(https_server);
-      https_server.on('request', app);
-      https_server.listen(443, function() {
-        console.log("https/wss server listening on port 443");
-      });
-      // Load a HTTP server, but only set up for redirection to https
-      if(http_server) {
-        http_server.close();
-        http_server = null;
-      }
-    } catch(e) {
-      global.ssl_info.enabled = false;
-      console.error(e);
-    }
-  }
+  let app = configureWebServer();
   // Fallback to normal http
   // - Do the listening
   if(http_server) {

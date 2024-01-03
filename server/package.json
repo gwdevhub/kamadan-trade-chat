@@ -2,7 +2,6 @@
 	"name": "kamadan-trade-server",
 	"version": "1.0.0",
 	"dependencies": {
-		"bcrypt": ">=1.0.2",
 		"body-parser": "~1.9.2",
 		"express": "*",
 		"morgan": "^1.9.1",
