@@ -17,6 +17,7 @@ function KamadanTrade() {
   this.table_prefix = 'kamadan_';
   this.last_message_by_user = {};
   this.current_trader_quotes = [];
+  this.last_quarantine_by_user = {};
 }
 KamadanTrade.prototype.housekeeping = function() {
   // Clear down last_message_by_user if over 1 minute old.
@@ -387,6 +388,7 @@ KamadanTrade.prototype.quarantineMessage = async function(message) {
   //console.log(message.m);
   let table = this.table_prefix+'quarantine';
   await this.db.query("INSERT INTO "+table+" (t,s,m) values (?,?,?)", [message.t,message.s,message.m]);
+  this.last_quarantine_by_user[message.s] = message.t;
   return message;
 }
 KamadanTrade.prototype.getQuarantine = async function(from,to) {
@@ -412,6 +414,10 @@ KamadanTrade.prototype.addMessage = async function(req,timestamp, channel) {
 
   if(quarantined) {
     await this.quarantineMessage(message);
+    return false;
+  }
+  if(this.last_quarantine_by_user[message.s] && (Date.now() - this.last_quarantine_by_user[message.s]) < 36e5) {
+    // This sender has a quarantine less than an hour ago; stops spammers trying to test the system
     return false;
   }
   let table = this.table_prefix+(new Date()).getUTCFullYear();
